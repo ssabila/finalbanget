@@ -9,7 +9,7 @@ $user = $auth->getCurrentUser();
 $database = new Database();
 $db = $database->getConnection();
 
-// Get recent lost & found items
+// Get recent lost & found items with images
 $lostFoundQuery = "SELECT lf.*, u.first_name, u.last_name, c.name as category_name
                     FROM lost_found_items lf
                     JOIN users u ON lf.user_id = u.id
@@ -20,7 +20,7 @@ $lostFoundStmt = $db->prepare($lostFoundQuery);
 $lostFoundStmt->execute();
 $lostFoundItems = $lostFoundStmt->fetchAll();
 
-// Get recent activities
+// Get recent activities with images
 $activitiesQuery = "SELECT a.*, u.first_name, u.last_name, c.name as category_name
                     FROM activities a
                     JOIN users u ON a.user_id = u.id
@@ -30,6 +30,28 @@ $activitiesQuery = "SELECT a.*, u.first_name, u.last_name, c.name as category_na
 $activitiesStmt = $db->prepare($activitiesQuery);
 $activitiesStmt->execute();
 $activities = $activitiesStmt->fetchAll();
+
+// Function to get appropriate icon based on category
+function getItemIcon($categoryName, $type) {
+    if ($type === 'lost_found') {
+        $iconMap = [
+            'elektronik' => 'laptop',
+            'aksesoris' => 'glasses',
+            'pakaian' => 'tshirt',
+            'buku' => 'book',
+            'alat tulis' => 'pen',
+            'tas' => 'briefcase',
+            'sepatu' => 'shoe-prints',
+            'perhiasan' => 'gem',
+            'kendaraan' => 'car',
+            'lainnya' => 'box'
+        ];
+        $normalizedCategory = strtolower($categoryName);
+        return $iconMap[$normalizedCategory] ?? 'search';
+    } else {
+        return 'calendar-alt';
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -154,9 +176,23 @@ $activities = $activitiesStmt->fetchAll();
             <div class="slider-container">
                 <div class="posts-slider">
                     <?php foreach ($lostFoundItems as $item): ?>
+                        <?php 
+                        $hasImage = !empty($item['image']) && file_exists($item['image']);
+                        $icon = getItemIcon($item['category_name'], 'lost_found');
+                        ?>
                         <div class="post-card" onclick="window.location.href='lost-found.php'">
-                            <div class="post-image">
-                                <i class="fas fa-search"></i>
+                            <div class="post-image <?= $hasImage ? 'has-image' : '' ?>">
+                                <?php if ($hasImage): ?>
+                                    <img src="<?= htmlspecialchars($item['image']) ?>" 
+                                         alt="<?= htmlspecialchars($item['title']) ?>" 
+                                         loading="lazy"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div class="fallback-icon" style="display: none;">
+                                        <i class="fas fa-<?= $icon ?>"></i>
+                                    </div>
+                                <?php else: ?>
+                                    <i class="fas fa-<?= $icon ?>"></i>
+                                <?php endif; ?>
                                 <div class="post-type-badge lost-found">Lost & Found</div>
                             </div>
                             <div class="post-content">
@@ -184,9 +220,23 @@ $activities = $activitiesStmt->fetchAll();
                     <?php endforeach; ?>
                     
                     <?php foreach ($activities as $activity): ?>
+                        <?php 
+                        $hasImage = !empty($activity['image']) && file_exists($activity['image']);
+                        $icon = getItemIcon($activity['category_name'], 'activity');
+                        ?>
                         <div class="post-card" onclick="window.location.href='activities.php'">
-                            <div class="post-image">
-                                <i class="fas fa-calendar-alt"></i>
+                            <div class="post-image <?= $hasImage ? 'has-image' : '' ?>">
+                                <?php if ($hasImage): ?>
+                                    <img src="<?= htmlspecialchars($activity['image']) ?>" 
+                                         alt="<?= htmlspecialchars($activity['title']) ?>" 
+                                         loading="lazy"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div class="fallback-icon" style="display: none;">
+                                        <i class="fas fa-<?= $icon ?>"></i>
+                                    </div>
+                                <?php else: ?>
+                                    <i class="fas fa-<?= $icon ?>"></i>
+                                <?php endif; ?>
                                 <div class="post-type-badge activity">Kegiatan</div>
                             </div>
                             <div class="post-content">
@@ -263,6 +313,7 @@ $activities = $activitiesStmt->fetchAll();
     </footer>
 
     <script src="assets/js/main.js"></script>
+    <script src="assets/js/home.js"></script>
     <script>
         function showNotification(message, type) {
             const notification = document.createElement('div');

@@ -1,0 +1,397 @@
+/* Avatar Upload Specific Styles */
+
+/* Modal Enhancements */
+.modal.avatar-modal .modal-content {
+    max-width: 600px;
+}
+
+/* Avatar Upload Container */
+.avatar-upload-container {
+    padding: 0;
+}
+
+.current-avatar-section {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.current-avatar-section h3 {
+    color: var(--text-dark);
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.current-avatar-display {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 4px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.current-avatar-display:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.current-avatar-display img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: all 0.3s ease;
+}
+
+/* Upload Section */
+.upload-avatar-section h3 {
+    margin-bottom: 1rem;
+    color: var(--text-dark);
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* Drag & Drop Zone */
+.avatar-drop-zone {
+    border: 3px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 3rem 2rem;
+    text-align: center;
+    background: rgba(75, 195, 255, 0.02);
+    transition: all 0.3s ease;
+    position: relative;
+    cursor: pointer;
+    margin-bottom: 1.5rem;
+}
+
+.avatar-drop-zone:hover {
+    border-color: var(--primary-color);
+    background: rgba(75, 195, 255, 0.05);
+    transform: translateY(-2px);
+}
+
+.avatar-drop-zone.dragover {
+    border-color: var(--primary-color);
+    background: rgba(75, 195, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(75, 195, 255, 0.2);
+}
+
+.drop-zone-content {
+    pointer-events: none;
+}
+
+.drop-zone-content i {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    display: block;
+    animation: float 3s ease-in-out infinite;
+}
+
+.drop-zone-content h4 {
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.drop-zone-content p {
+    color: var(--text-light);
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Preview Section */
+.avatar-preview {
+    text-align: center;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(75, 195, 255, 0.05), rgba(149, 232, 222, 0.05));
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgba(75, 195, 255, 0.1);
+}
+
+.avatar-preview h4 {
+    margin-bottom: 1rem;
+    color: var(--text-dark);
+    font-weight: 600;
+}
+
+.preview-container {
+    width: 150px;
+    height: 150px;
+    margin: 0 auto;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid var(--primary-color);
+    box-shadow: 0 4px 12px rgba(75, 195, 255, 0.3);
+    position: relative;
+}
+
+.preview-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: all 0.3s ease;
+}
+
+.preview-container:hover img {
+    transform: scale(1.1);
+}
+
+/* Action Buttons */
+.avatar-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.avatar-actions .btn-primary,
+.avatar-actions .btn-secondary,
+.avatar-actions .btn-danger {
+    min-width: 140px;
+    padding: 0.875rem 1.5rem;
+    font-weight: 600;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.95rem;
+}
+
+/* Danger Button Specific */
+.btn-danger {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #c0392b, #a93226);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(231, 76, 60, 0.3);
+}
+
+/* Disabled State */
+.btn-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+    background: #95a5a6 !important;
+}
+
+/* Loading State */
+.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.loading i.fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+/* Profile Avatar Button */
+.change-avatar-btn {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: var(--white);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 5;
+}
+
+.change-avatar-btn:hover {
+    background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(75, 195, 255, 0.4);
+}
+
+.change-avatar-btn i {
+    font-size: 0.9rem;
+}
+
+/* Navigation Avatar */
+.nav-auth .btn-login img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 0.5rem;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Animations */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.avatar-preview {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .avatar-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .avatar-actions .btn-primary,
+    .avatar-actions .btn-secondary,
+    .avatar-actions .btn-danger {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .avatar-drop-zone {
+        padding: 2rem 1rem;
+    }
+    
+    .drop-zone-content i {
+        font-size: 2.5rem;
+    }
+    
+    .current-avatar-display {
+        width: 100px;
+        height: 100px;
+    }
+    
+    .preview-container {
+        width: 120px;
+        height: 120px;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal-content {
+        margin: 1rem;
+        width: calc(100% - 2rem);
+    }
+    
+    .avatar-drop-zone {
+        padding: 1.5rem 1rem;
+    }
+    
+    .drop-zone-content h4 {
+        font-size: 1rem;
+    }
+    
+    .drop-zone-content p {
+        font-size: 0.8rem;
+    }
+}
+
+/* File Input Enhancements */
+#avatar-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 10;
+}
+
+/* Success/Error States */
+.upload-success {
+    border-color: #2ecc71;
+    background: rgba(46, 204, 113, 0.1);
+}
+
+.upload-error {
+    border-color: #e74c3c;
+    background: rgba(231, 76, 60, 0.1);
+}
+
+/* Tooltip Styles */
+.tooltip {
+    position: relative;
+}
+
+.tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+}
+
+.tooltip:hover::after {
+    opacity: 1;
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+    .avatar-drop-zone {
+        background: rgba(75, 195, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .avatar-preview {
+        background: rgba(75, 195, 255, 0.03);
+        border-color: rgba(75, 195, 255, 0.1);
+    }
+}

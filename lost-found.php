@@ -260,16 +260,6 @@ try {
                 <?php else: ?>
                     <?php foreach ($items as $item): ?>
                         <div class="lost-found-item" data-id="<?= $item['id'] ?>" onclick="showItemDetail(<?= $item['id'] ?>)">
-                            <?php if ($user && $user['id'] == $item['user_id']): ?>
-                                <div class="item-actions-overlay">
-                                    <button class="action-btn edit-btn" onclick="event.stopPropagation(); editItem(<?= $item['id'] ?>, 'lost-found')" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="action-btn delete-btn" onclick="event.stopPropagation(); deleteItem(<?= $item['id'] ?>, 'lost-found')" title="Hapus">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            <?php endif; ?>
                             
                             <?php 
                             // Cek apakah ada gambar dan file exists

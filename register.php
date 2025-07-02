@@ -78,20 +78,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <?php if (!$success): ?>
             <form class="auth-form" method="POST">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="firstName">Nama Depan</label>
-                        <div class="input-group">
-                            <i class="fas fa-user"></i>
-                            <input type="text" id="firstName" name="firstName" value="<?= htmlspecialchars($_POST['firstName'] ?? '') ?>" required>
-                        </div>
+                <div class="form-group">
+                    <label for="firstName">Nama Depan</label>
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="firstName" name="firstName" value="<?= htmlspecialchars($_POST['firstName'] ?? '') ?>" required>
                     </div>
-                    <div class="form-group">
-                        <label for="lastName">Nama Belakang</label>
-                        <div class="input-group">
-                            <i class="fas fa-user"></i>
-                            <input type="text" id="lastName" name="lastName" value="<?= htmlspecialchars($_POST['lastName'] ?? '') ?>" required>
-                        </div>
+                </div>
+                <div class="form-group">
+                    <label for="lastName">Nama Belakang</label>
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="lastName" name="lastName" value="<?= htmlspecialchars($_POST['lastName'] ?? '') ?>" required>
                     </div>
                 </div>
                 
@@ -118,30 +116,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="tel" id="phone" name="phone" value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>" required>
                     </div>
                 </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="password">Kata Sandi</label>
-                        <div class="input-group">
-                            <i class="fas fa-lock"></i>
-                            <input type="password" id="password" name="password" required>
-                            <button type="button" class="toggle-password">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="confirmPassword">Konfirmasi Kata Sandi</label>
-                        <div class="input-group">
-                            <i class="fas fa-lock"></i>
-                            <input type="password" id="confirmPassword" name="confirmPassword" required>
-                            <button type="button" class="toggle-password">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
+                <div class="form-group">
+                    <label for="password">Kata Sandi</label>
+                    <div class="input-group">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="password" name="password" required>
+                        <button type="button" class="toggle-password">
+                            <i class="fas fa-eye"></i>
+                        </button>
                     </div>
                 </div>
-                
+                <div class="form-group">
+                    <label for="confirmPassword">Konfirmasi Kata Sandi</label>
+                    <div class="input-group">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="confirmPassword" name="confirmPassword" required>
+                        <button type="button" class="toggle-password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
                 <button type="submit" class="btn-primary btn-full">
                     <i class="fas fa-user-plus"></i>
                     Daftar

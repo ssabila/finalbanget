@@ -49,7 +49,9 @@ document.addEventListener("DOMContentLoaded", () => {
             user: item.user_name,
             type: "lost-found",
             icon: "fas fa-search",
-            link: "lost-found.html",
+            link: "lost-found.php",
+            image: item.image || null, // Add image field
+            category_name: item.category_name
           })
         })
       }
@@ -68,7 +70,9 @@ document.addEventListener("DOMContentLoaded", () => {
             user: activity.user_name,
             type: "activity",
             icon: "fas fa-calendar-alt",
-            link: "activities.html",
+            link: "activities.php",
+            image: activity.image || null, // Add image field
+            category_name: activity.category_name
           })
         })
       }
@@ -118,10 +122,47 @@ document.addEventListener("DOMContentLoaded", () => {
       year: "numeric",
     })
 
+    // Determine icon based on category for fallback
+    const getItemIcon = (category, type) => {
+      if (type === 'lost-found') {
+        const iconMap = {
+          'elektronik': 'laptop',
+          'aksesoris': 'glasses',
+          'pakaian': 'tshirt',
+          'buku': 'book',
+          'alat tulis': 'pen',
+          'tas': 'briefcase',
+          'sepatu': 'shoe-prints',
+          'perhiasan': 'gem',
+          'kendaraan': 'car',
+          'lainnya': 'box'
+        }
+        const normalizedCategory = (category || '').toLowerCase()
+        return iconMap[normalizedCategory] || 'search'
+      } else {
+        return 'calendar-alt'
+      }
+    }
+
+    const fallbackIcon = getItemIcon(post.category_name, post.type)
+    
+    // Check if image exists and is not empty
+    const hasImage = post.image && post.image.trim() !== ''
+
     return `
       <div class="post-card" data-type="${post.type}" onclick="window.location.href='${post.link}'">
-        <div class="post-image">
-          <i class="${post.icon}"></i>
+        <div class="post-image ${hasImage ? 'has-image' : ''}">
+          ${hasImage ? `
+            <img src="${post.image}" 
+                 alt="${post.title}" 
+                 loading="lazy"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="fallback-icon" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3rem; color: white;">
+              <i class="fas fa-${fallbackIcon}"></i>
+            </div>
+          ` : `
+            <i class="fas fa-${fallbackIcon}"></i>
+          `}
           <div class="post-type-badge ${post.type}">
             ${post.type === "lost-found" ? "Lost & Found" : "Kegiatan"}
           </div>

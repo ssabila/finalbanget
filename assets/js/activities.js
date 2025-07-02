@@ -1,485 +1,415 @@
-// Activities page functionality
-document.addEventListener("DOMContentLoaded", () => { 
-  // DOM elements
-  const activitiesContainer = document.getElementById("activities-container")
-  const searchInput = document.getElementById("search-input")
-  const categoryFilter = document.getElementById("category-filter")
-  const dateFilter = document.getElementById("date-filter")
-  const addButton = document.getElementById("add-button")
-  const addModal = document.getElementById("add-modal")
-  const detailModal = document.getElementById("detail-modal")
-  const addForm = document.getElementById("add-form")
+// Activities page functionality - Complete implementation
+document.addEventListener("DOMContentLoaded", () => {
+  // Setup event listeners untuk cards yang sudah ada dari PHP
+  setupExistingCards();
+  
+  // Setup modal functionality
+  setupModalHandlers();
+  
+  // Setup form handlers
+  setupFormHandlers();
+  
+  // Handle PHP messages
+  handlePhpMessages();
+});
 
-  // Modal controls
-  const closeModalBtns = document.querySelectorAll(".close-modal")
-  const cancelBtn = document.getElementById("cancel-btn")
+function setupExistingCards() {
+  // Setup click events untuk activity cards yang sudah di-render oleh PHP
+  const activityCards = document.querySelectorAll('.activity-item');
+  activityCards.forEach(card => {
+    // Event sudah ditambahkan via onclick di HTML, jadi kita tidak perlu menambahkan lagi
+    // Tapi kita bisa menambahkan hover effects atau hal lain jika diperlukan
+    card.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-5px)';
+    });
+    
+    card.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(0)';
+    });
+  });
+}
 
-  let sampleActivities = [] // Data dari API
-  let currentActivities = []
-
-  // Initialize page
-  init()
-
-  async function init() {
-    await loadActivities()
-    setupEventListeners()
-    hideLoading()
-    initializeAuthState()
-  }
-
-  function setupEventListeners() {
-    // Search functionality
-    if (searchInput) {
-      searchInput.addEventListener("input", debounce(filterActivities, 300))
+function setupModalHandlers() {
+  // Close modal when clicking outside
+  window.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal')) {
+      e.target.classList.remove('active');
     }
+  });
 
-    // Filter functionality
-    if (categoryFilter) {
-      categoryFilter.addEventListener("change", filterActivities)
+  // Close modal with escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      const activeModals = document.querySelectorAll('.modal.active');
+      activeModals.forEach(modal => {
+        modal.classList.remove('active');
+      });
     }
+  });
 
-    if (dateFilter) {
-      dateFilter.addEventListener("change", filterActivities)
-    }
-
-    // Modal controls
-    if (addButton) {
-      addButton.addEventListener("click", openAddModal)
-    }
-
-    closeModalBtns.forEach((btn) => {
-      btn.addEventListener("click", closeModals)
-    })
-
-    if (cancelBtn) {
-      cancelBtn.addEventListener("click", closeModals)
-    }
-
-    // Form submission
-    if (addForm) {
-      addForm.addEventListener("submit", handleAddActivity)
-    }
-
-    // Close modal when clicking outside
-    window.addEventListener("click", (e) => {
-      if (e.target.classList.contains("modal")) {
-        closeModals()
+  // Setup close button handlers
+  const closeButtons = document.querySelectorAll('.close-modal');
+  closeButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      const modal = this.closest('.modal');
+      if (modal) {
+        modal.classList.remove('active');
       }
-    })
+    });
+  });
+}
+
+function setupFormHandlers() {
+  // Image preview functionality
+  const imageInput = document.getElementById('image');
+  if (imageInput) {
+    imageInput.addEventListener('change', function() {
+      previewImage(this);
+    });
   }
 
-  // Update the loadActivities function to handle authentication
-  async function loadActivities() {
-    try {
-      showLoading()
-      const response = await fetch("api/activities/index.php")
-      const data = await response.json()
-
-      if (response.ok) {
-        sampleActivities = data
-        currentActivities = [...data]
-        displayActivities(currentActivities)
-      } else {
-        showError("Gagal memuat data: " + (data.error || "Unknown error"))
+  // Form validation
+  const forms = document.querySelectorAll('form');
+  forms.forEach(form => {
+    form.addEventListener('submit', function(e) {
+      if (!validateForm(this)) {
+        e.preventDefault();
+        return false;
       }
-    } catch (error) {
-      console.error("Error loading activities:", error)
-      showError("Gagal terhubung ke server")
-    } finally {
-      hideLoading()
+    });
+  });
+}
+
+function handlePhpMessages() {
+  // Handle messages passed from PHP
+  if (window.phpMessage) {
+    const { text, type } = window.phpMessage;
+    
+    // Show notification instead of alert for better UX
+    if (typeof showNotification === 'function') {
+      showNotification(text, type);
+    } else {
+      // Fallback to alert if showNotification is not available
+      const icon = type === 'success' ? '✅' : '❌';
+      alert(icon + ' ' + text);
+    }
+    
+    // Clean up
+    delete window.phpMessage;
+  }
+}
+
+function validateForm(form) {
+  const requiredFields = form.querySelectorAll('[required]');
+  let isValid = true;
+
+  requiredFields.forEach(field => {
+    if (!field.value.trim()) {
+      showFieldError(field, 'Field ini wajib diisi');
+      isValid = false;
+    } else {
+      clearFieldError(field);
+    }
+  });
+
+  // Validasi khusus untuk tanggal
+  const eventDate = form.querySelector('#event_date');
+  if (eventDate && eventDate.value) {
+    const selectedDate = new Date(eventDate.value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (selectedDate < today) {
+      showFieldError(eventDate, 'Tanggal kegiatan tidak boleh di masa lalu');
+      isValid = false;
     }
   }
 
-  function displayActivities(activities) {
-    if (!activitiesContainer) return
+  return isValid;
+}
 
-    if (activities.length === 0) {
-      activitiesContainer.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-calendar-times"></i>
-                    <h3>Tidak ada kegiatan ditemukan</h3>
-                    <p>Belum ada kegiatan yang sesuai dengan filter Anda</p>
-                </div>
-            `
-      return
+function showFieldError(field, message) {
+  const formGroup = field.closest('.form-group');
+  if (!formGroup) return;
+
+  formGroup.classList.add('error');
+  
+  let errorMessage = formGroup.querySelector('.error-message');
+  if (!errorMessage) {
+    errorMessage = document.createElement('div');
+    errorMessage.className = 'error-message';
+    formGroup.appendChild(errorMessage);
+  }
+  
+  errorMessage.textContent = message;
+  errorMessage.style.display = 'block';
+}
+
+function clearFieldError(field) {
+  const formGroup = field.closest('.form-group');
+  if (!formGroup) return;
+
+  formGroup.classList.remove('error');
+  
+  const errorMessage = formGroup.querySelector('.error-message');
+  if (errorMessage) {
+    errorMessage.style.display = 'none';
+  }
+}
+
+// Global functions yang dipanggil dari HTML
+window.openModal = function(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.add('active');
+    
+    // Focus ke form pertama jika ada
+    const firstInput = modal.querySelector('input, select, textarea');
+    if (firstInput) {
+      setTimeout(() => firstInput.focus(), 100);
     }
-
-    const activitiesHTML = activities.map((activity) => createActivityCard(activity)).join("")
-    activitiesContainer.innerHTML = activitiesHTML
-
-    // Add click event listeners to activity cards
-    const activityCards = activitiesContainer.querySelectorAll(".activity-item")
-    activityCards.forEach((card) => {
-      card.addEventListener("click", function () {
-        const activityId = this.dataset.id
-        showActivityDetail(activityId)
-      })
-    })
   }
+}
 
-  function createActivityCard(activity) {
-    const eventDate = new Date(activity.event_date)
-    const day = eventDate.getDate()
-    const month = eventDate.toLocaleDateString("id-ID", { month: "short" })
-    const formattedDate = eventDate.toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
-    const formattedTime = activity.event_time.substring(0, 5)
-
-    return `
-            <div class="activity-item" data-id="${activity.id}">
-                <div class="activity-image">
-                    <i class="fas fa-calendar-alt"></i>
-                    <div class="activity-date">
-                        <span class="day">${day}</span>
-                        <span class="month">${month}</span>
-                    </div>
-                </div>
-                <div class="activity-content">
-                    <div class="activity-category category-${activity.category}">
-                        ${activity.category_name}
-                    </div>
-                    <h3 class="activity-title">${activity.title}</h3>
-                    <div class="activity-meta">
-                        <div class="meta-row">
-                            <i class="fas fa-clock"></i>
-                            <span>${formattedDate}, ${formattedTime}</span>
-                        </div>
-                        <div class="meta-row">
-                            <i class="fas fa-map-marker-alt"></i>
-                            <span>${activity.location}</span>
-                        </div>
-                        <div class="meta-row">
-                            <i class="fas fa-user"></i>
-                            <span>${activity.organizer}</span>
-                        </div>
-                    </div>
-                    <p class="activity-description">${activity.description}</p>
-                    <div class="activity-organizer">oleh ${activity.user_name}</div>
-                </div>
-            </div>
-        `
-  }
-
-  function filterActivities() {
-    const searchTerm = searchInput ? searchInput.value.toLowerCase() : ""
-    const selectedCategory = categoryFilter ? categoryFilter.value : ""
-    const selectedDate = dateFilter ? dateFilter.value : ""
-
-    const filtered = sampleActivities.filter((activity) => {
-      const matchesSearch =
-        activity.title.toLowerCase().includes(searchTerm) ||
-        activity.description.toLowerCase().includes(searchTerm) ||
-        activity.organizer.toLowerCase().includes(searchTerm)
-
-      const matchesCategory = !selectedCategory || activity.category === selectedCategory
-
-      let matchesDate = true
-      if (selectedDate) {
-        const activityDate = new Date(activity.event_date)
-        const today = new Date()
-
-        switch (selectedDate) {
-          case "today":
-            matchesDate = activityDate.toDateString() === today.toDateString()
-            break
-          case "week":
-            const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-            matchesDate = activityDate >= today && activityDate <= weekFromNow
-            break
-          case "month":
-            const monthFromNow = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate())
-            matchesDate = activityDate >= today && activityDate <= monthFromNow
-            break
-          case "upcoming":
-            matchesDate = activityDate >= today
-            break
-        }
+window.closeModal = function(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.remove('active');
+    
+    // Reset form jika ada
+    const form = modal.querySelector('form');
+    if (form) {
+      form.reset();
+      
+      // Clear form errors
+      const errorElements = form.querySelectorAll('.error-message');
+      errorElements.forEach(error => error.style.display = 'none');
+      
+      const formGroups = form.querySelectorAll('.form-group.error');
+      formGroups.forEach(group => group.classList.remove('error'));
+      
+      // Hide image preview
+      const imagePreview = form.querySelector('#image-preview');
+      if (imagePreview) {
+        imagePreview.style.display = 'none';
       }
-
-      return matchesSearch && matchesCategory && matchesDate
-    })
-
-    currentActivities = filtered
-    displayActivities(filtered)
+    }
   }
+}
 
-  function showActivityDetail(activityId) {
-    const activity = sampleActivities.find((a) => a.id == activityId)
-    if (!activity) return
+window.previewImage = function(input) {
+  const preview = document.getElementById('image-preview');
+  const previewImg = document.getElementById('preview-img');
+  
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      alert('Hanya file gambar (JPG, PNG, GIF) yang diperbolehkan!');
+      input.value = '';
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      alert('Ukuran file terlalu besar! Maksimal 5MB.');
+      input.value = '';
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      if (previewImg) {
+        previewImg.src = e.target.result;
+      }
+      if (preview) {
+        preview.style.display = 'block';
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+}
 
-    const eventDate = new Date(activity.event_date)
+window.removeImage = function() {
+  const input = document.getElementById('image');
+  const preview = document.getElementById('image-preview');
+  
+  if (input) input.value = '';
+  if (preview) preview.style.display = 'none';
+}
+
+window.showActivityDetail = function(activityId) {
+  const activityCard = document.querySelector(`[data-id="${activityId}"]`);
+  if (!activityCard) return;
+  
+  const activityDataScript = activityCard.querySelector('.activity-data');
+  if (!activityDataScript) return;
+  
+  try {
+    const activityData = JSON.parse(activityDataScript.textContent);
+    
+    // Format tanggal dan waktu
+    const eventDate = new Date(activityData.event_date);
     const formattedDate = eventDate.toLocaleDateString("id-ID", {
       weekday: "long",
-      day: "numeric",
+      day: "numeric", 
       month: "long",
+      year: "numeric"
+    });
+    
+    const formattedTime = activityData.event_time.substring(0, 5);
+    
+    const formattedCreatedAt = new Date(activityData.created_at).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long", 
       year: "numeric",
-    })
-    const formattedTime = activity.event_time.substring(0, 5)
-
-    const detailContent = document.getElementById("detail-content")
-    const detailTitle = document.getElementById("detail-title")
-
-    if (detailTitle) {
-      detailTitle.textContent = activity.title
-    }
-
-    if (detailContent) {
-      detailContent.innerHTML = `
-                <div class="activity-detail-content">
-                    <div class="activity-detail-image">
-                        <i class="fas fa-calendar-alt"></i>
-                    </div>
-                    <div class="activity-detail-info">
-                        <div class="activity-category category-${activity.category}">
-                            ${activity.category_name}
-                        </div>
-                        <h3>${activity.title}</h3>
-                        <div class="activity-detail-meta">
-                            <div class="meta-item">
-                                <i class="fas fa-calendar"></i>
-                                <span>${formattedDate}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-clock"></i>
-                                <span>${formattedTime} WIB</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-map-marker-alt"></i>
-                                <span>${activity.location}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-user"></i>
-                                <span>${activity.organizer}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-phone"></i>
-                                <span>${activity.contact_info}</span>
-                            </div>
-                        </div>
-                        <div class="activity-detail-description">
-                            <p>${activity.description}</p>
-                        </div>
-                        <div class="activity-detail-actions">
-                            <a href="https://wa.me/${activity.contact_info}" target="_blank" class="register-btn">
-                                <i class="fab fa-whatsapp"></i>
-                                Hubungi Penyelenggara
-                            </a>
-                            <button class="share-btn" onclick="shareActivity('${activity.title}', '${activity.description}')">
-                                <i class="fas fa-share"></i>
-                                Bagikan
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `
-    }
-
-    if (detailModal) {
-      detailModal.classList.add("active")
-    }
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    
+    // Buat konten modal
+    const modalBody = document.getElementById('detail-modal-body');
+    const modalTitle = document.getElementById('detail-modal-title');
+    
+    modalTitle.textContent = activityData.title;
+    
+    modalBody.innerHTML = `
+      <div class="activity-detail-content">
+        <div class="activity-detail-image-section">
+          ${activityData.image && activityData.image.trim() !== '' ? `
+            <div class="activity-detail-image-container">
+              <img src="${activityData.image}" 
+                   alt="${activityData.title}" 
+                   class="activity-detail-image-large"
+                   onerror="this.parentElement.innerHTML = '<div class=\\'activity-detail-image-placeholder\\'><i class=\\'fas fa-calendar-alt\\' style=\\'font-size: 5rem; color: white;\\'></i></div>';">
+            </div>
+          ` : `
+            <div class="activity-detail-image-container no-image">
+              <div class="activity-detail-image-placeholder">
+                <i class="fas fa-calendar-alt" style="font-size: 5rem; color: white; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"></i>
+              </div>
+            </div>
+          `}
+        </div>
+        
+        <div class="activity-detail-info-section">
+          <div class="activity-detail-category">
+            <span class="category-badge">${activityData.category_name}</span>
+          </div>
+          
+          <h3 class="activity-detail-title">${activityData.title}</h3>
+          
+          <div class="activity-detail-meta">
+            <div class="meta-row">
+              <i class="fas fa-calendar"></i>
+              <span><strong>Tanggal:</strong> ${formattedDate}</span>
+            </div>
+            <div class="meta-row">
+              <i class="fas fa-clock"></i>
+              <span><strong>Waktu:</strong> ${formattedTime} WIB</span>
+            </div>
+            <div class="meta-row">
+              <i class="fas fa-map-marker-alt"></i>
+              <span><strong>Lokasi:</strong> ${activityData.location}</span>
+            </div>
+            <div class="meta-row">
+              <i class="fas fa-users"></i>
+              <span><strong>Penyelenggara:</strong> ${activityData.organizer}</span>
+            </div>
+            <div class="meta-row">
+              <i class="fas fa-user"></i>
+              <span><strong>Dibuat oleh:</strong> ${activityData.user_name}</span>
+            </div>
+            <div class="meta-row">
+              <i class="fas fa-clock"></i>
+              <span><strong>Tanggal Dibuat:</strong> ${formattedCreatedAt}</span>
+            </div>
+          </div>
+          
+          <div class="activity-detail-description">
+            <h4>Deskripsi:</h4>
+            <p>${activityData.description}</p>
+          </div>
+          
+          <div class="activity-detail-actions">
+            <a href="https://wa.me/${activityData.contact_info.replace(/[^0-9]/g, '')}" 
+               target="_blank" 
+               class="contact-btn-large">
+              <i class="fab fa-whatsapp"></i>
+              Hubungi Penyelenggara
+            </a>
+            <button class="share-btn" onclick="shareActivity('${activityData.title.replace(/'/g, "\\'")}', '${activityData.description.replace(/'/g, "\\'")}')">
+              <i class="fas fa-share"></i>
+              Bagikan
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Tampilkan modal
+    openModal('detail-modal');
+  } catch (error) {
+    console.error('Error parsing activity data:', error);
+    alert('Terjadi kesalahan saat menampilkan detail kegiatan.');
   }
+}
 
-  // Update the openAddModal function to check authentication
-  function openAddModal() {
-    if (!requireAuth()) {
-      return
-    }
-
-    if (addModal) {
-      addModal.classList.add("active")
-    }
+window.shareActivity = function(title, description) {
+  if (navigator.share) {
+    navigator.share({
+      title: title,
+      text: description,
+      url: window.location.href,
+    });
+  } else {
+    // Fallback - copy to clipboard
+    const text = `${title}\n\n${description}\n\n${window.location.href}`;
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Link kegiatan berhasil disalin!");
+    }).catch(() => {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      alert("Link kegiatan berhasil disalin!");
+    });
   }
+}
 
-  function closeModals() {
-    const modals = document.querySelectorAll(".modal")
-    modals.forEach((modal) => {
-      modal.classList.remove("active")
-    })
+// Utility functions
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
-    // Reset form
-    if (addForm) {
-      addForm.reset()
-    }
-  }
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
-  // Update the handleAddActivity function to use authentication
-  async function handleAddActivity(e) {
-    e.preventDefault()
+function formatTime(timeString) {
+  return timeString.substring(0, 5);
+}
 
-    if (!requireAuth()) {
-      return
-    }
-
-    const formData = new FormData(addForm)
-    const submitBtn = addForm.querySelector('button[type="submit"]')
-
-    // Show loading state
-    submitBtn.classList.add("loading")
-    submitBtn.disabled = true
-
-    try {
-      // Handle image upload first if there's an image
-      let imagePath = null
-      const imageFile = formData.get("image")
-
-      if (imageFile && imageFile.size > 0) {
-        const imageFormData = new FormData()
-        imageFormData.append("image", imageFile)
-        imageFormData.append("type", "activity")
-
-        const imageResponse = await authenticatedFetch("api/upload/image.php", {
-          method: "POST",
-          body: imageFormData,
-          headers: {}, // Remove Content-Type to let browser set it for FormData
-        })
-
-        if (imageResponse.ok) {
-          const imageData = await imageResponse.json()
-          imagePath = imageData.filename
-        }
-      }
-
-      // Create the activity
-      const activityData = {
-        title: formData.get("title"),
-        description: formData.get("description"),
-        category_id: formData.get("category"),
-        event_date: formData.get("date"),
-        event_time: formData.get("time"),
-        location: formData.get("location"),
-        organizer: formData.get("organizer"),
-        image: imagePath,
-      }
-
-      const response = await authenticatedFetch("api/activities/index.php", {
-        method: "POST",
-        body: JSON.stringify(activityData),
-      })
-
-      const result = await response.json()
-
-      if (response.ok) {
-        showNotification("Kegiatan berhasil ditambahkan!", "success")
-        closeModals()
-
-        // Reload activities
-        await loadActivities()
-      } else {
-        showNotification(result.error || "Gagal menambahkan kegiatan", "error")
-      }
-    } catch (error) {
-      console.error("Error adding activity:", error)
-      showNotification("Terjadi kesalahan saat menambahkan kegiatan", "error")
-    } finally {
-      // Remove loading state
-      submitBtn.classList.remove("loading")
-      submitBtn.disabled = false
-    }
-  }
-
-  function getCategoryName(category) {
-    const categoryMap = {
-      seminar: "Seminar",
-      workshop: "Workshop",
-      kompetisi: "Kompetisi",
-      organisasi: "Organisasi",
-      olahraga: "Olahraga",
-      seni: "Seni & Budaya",
-    }
-    return categoryMap[category] || category
-  }
-
-  function hideLoading() {
-    const loading = document.getElementById("loading")
-    if (loading) {
-      loading.style.display = "none"
-    }
-  }
-
-  // Utility functions
-  function debounce(func, wait) {
-    let timeout
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout)
-        func(...args)
-      }
-      clearTimeout(timeout)
-      timeout = setTimeout(later, wait)
-    }
-  }
-
-  // Global function for sharing
-  window.shareActivity = (title, description) => {
-    if (navigator.share) {
-      navigator.share({
-        title: title,
-        text: description,
-        url: window.location.href,
-      })
-    } else {
-      // Fallback - copy to clipboard
-      const text = `${title}\n\n${description}\n\n${window.location.href}`
-      navigator.clipboard.writeText(text).then(() => {
-        alert("Link kegiatan berhasil disalin!")
-      })
-    }
-  }
-
-  function showLoading() {
-    const loading = document.getElementById("loading")
-    if (loading) {
-      loading.style.display = "block"
-    }
-  }
-
-  function showError(message) {
-    const errorContainer = document.getElementById("error-message")
-    if (errorContainer) {
-      errorContainer.textContent = message
-      errorContainer.style.display = "block"
-    } else {
-      alert(message)
-    }
-  }
-
-  // Add this function to initialize auth state on page load
-  function initializeAuthState() {
-    if (!isAuthenticated()) {
-      // Hide add button for non-authenticated users
-      const addButton = document.getElementById("add-button")
-      if (addButton) {
-        addButton.style.display = "none"
-      }
-    }
-  }
-
-  // Mock functions for requireAuth, authenticatedFetch, showNotification, and isAuthenticated
-  // Replace these with your actual implementation
-  function requireAuth() {
-    console.log("requireAuth called")
-    return true // Replace with your actual authentication check
-  }
-
-  async function authenticatedFetch(url, options) {
-    console.log("authenticatedFetch called with", url, options)
-    // Simulate a successful response
-    return Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve({ message: "Success" }),
-    })
-  }
-
-  function showNotification(message, type) {
-    console.log(`Notification: ${message} (Type: ${type})`)
-    alert(message) // Replace with your actual notification implementation
-  }
-
-  function isAuthenticated() {
-    console.log("isAuthenticated called")
-    return true // Replace with your actual authentication check
-  }
-})
+// Export utility functions to global scope
+window.debounce = debounce;
+window.formatDate = formatDate;
+window.formatTime = formatTime;

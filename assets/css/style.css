@@ -318,15 +318,9 @@ body {
 
 /* Enhanced Forms */
 .form-group {
-  padding: 2rem;
-  margin-bottom: 1.5rem;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
   position: relative;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
 }
 
 .form-group label {
@@ -366,7 +360,7 @@ body {
 .input-group input,
 .input-group select,
 .input-group textarea {
-  width: 100%;
+  width: 150%;
   padding: 1rem 1rem 1rem 2.75rem;
   border: 2px solid var(--border-color);
   border-radius: 12px;
@@ -543,9 +537,6 @@ select {
 
 /* Responsive form adjustments */
 @media (max-width: 768px) {
-  .form-row {
-    grid-template-columns: 1fr;
-  }
 
   .form-actions {
     flex-direction: column-reverse;
@@ -739,10 +730,6 @@ select {
 
   .hamburger.active span:nth-child(3) {
     transform: rotate(-45deg) translate(7px, -6px);
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
   }
 
   .footer-content {

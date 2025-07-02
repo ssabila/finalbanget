@@ -12,6 +12,172 @@ $db = $database->getConnection();
 $message = '';
 $messageType = '';
 
+// Handle delete lost & found item
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_lost_found'])) {
+    $itemId = $_POST['item_id'] ?? 0;
+    
+    if ($itemId > 0) {
+        // Check if item belongs to current user
+        $checkQuery = "SELECT * FROM lost_found_items WHERE id = ? AND user_id = ?";
+        $checkStmt = $db->prepare($checkQuery);
+        $checkStmt->execute([$itemId, $user['id']]);
+        $item = $checkStmt->fetch();
+        
+        if ($item) {
+            // Delete image file if exists
+            if (!empty($item['image']) && file_exists($item['image'])) {
+                unlink($item['image']);
+            }
+            
+            // Delete from database
+            $deleteQuery = "DELETE FROM lost_found_items WHERE id = ? AND user_id = ?";
+            $deleteStmt = $db->prepare($deleteQuery);
+            
+            if ($deleteStmt->execute([$itemId, $user['id']])) {
+                header('Location: profile.php?deleted_lf=1');
+                exit;
+            } else {
+                $message = 'Gagal menghapus laporan';
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Laporan tidak ditemukan atau Anda tidak memiliki akses';
+            $messageType = 'error';
+        }
+    }
+}
+
+// Handle delete activity
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_activity'])) {
+    $itemId = $_POST['item_id'] ?? 0;
+    
+    if ($itemId > 0) {
+        // Check if activity belongs to current user
+        $checkQuery = "SELECT * FROM activities WHERE id = ? AND user_id = ?";
+        $checkStmt = $db->prepare($checkQuery);
+        $checkStmt->execute([$itemId, $user['id']]);
+        $activity = $checkStmt->fetch();
+        
+        if ($activity) {
+            // Delete image file if exists
+            if (!empty($activity['image']) && file_exists($activity['image'])) {
+                unlink($activity['image']);
+            }
+            
+            // Delete from database
+            $deleteQuery = "DELETE FROM activities WHERE id = ? AND user_id = ?";
+            $deleteStmt = $db->prepare($deleteQuery);
+            
+            if ($deleteStmt->execute([$itemId, $user['id']])) {
+                header('Location: profile.php?deleted_activity=1');
+                exit;
+            } else {
+                $message = 'Gagal menghapus kegiatan';
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Kegiatan tidak ditemukan atau Anda tidak memiliki akses';
+            $messageType = 'error';
+        }
+    }
+}
+
+// Handle avatar upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_avatar'])) {
+    if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+        $uploadDir = 'uploads/avatars/';
+        
+        // Buat direktori jika belum ada
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        
+        $fileExtension = strtolower(pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION));
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+        
+        if (in_array($fileExtension, $allowedExtensions)) {
+            // Validasi ukuran file (max 2MB untuk avatar)
+            if ($_FILES['avatar']['size'] > 2 * 1024 * 1024) {
+                $message = 'Ukuran file terlalu besar! Maksimal 2MB untuk foto profil.';
+                $messageType = 'error';
+            } else {
+                // Validasi adalah gambar yang valid
+                $imageInfo = getimagesize($_FILES['avatar']['tmp_name']);
+                if ($imageInfo === false) {
+                    $message = 'File yang diupload bukan gambar yang valid.';
+                    $messageType = 'error';
+                } else {
+                    // Hapus avatar lama jika ada
+                    if (!empty($user['avatar']) && file_exists($uploadDir . $user['avatar'])) {
+                        unlink($uploadDir . $user['avatar']);
+                    }
+                    
+                    $fileName = 'avatar_' . $user['id'] . '_' . time() . '.' . $fileExtension;
+                    $targetPath = $uploadDir . $fileName;
+                    
+                    if (move_uploaded_file($_FILES['avatar']['tmp_name'], $targetPath)) {
+                        // Update database
+                        try {
+                            $updateQuery = "UPDATE users SET avatar = ? WHERE id = ?";
+                            $stmt = $db->prepare($updateQuery);
+                            
+                            if ($stmt->execute([$fileName, $user['id']])) {
+                                // Update session data
+                                $_SESSION['user_data']['avatar'] = $fileName;
+                                
+                                // Redirect untuk menghindari resubmission dan alert berulang
+                                header('Location: profile.php?avatar_updated=1');
+                                exit;
+                            } else {
+                                $message = 'Gagal memperbarui foto profil di database.';
+                                $messageType = 'error';
+                                
+                                // Hapus file jika update database gagal
+                                if (file_exists($targetPath)) {
+                                    unlink($targetPath);
+                                }
+                            }
+                        } catch (Exception $e) {
+                            $message = 'Terjadi kesalahan: ' . $e->getMessage();
+                            $messageType = 'error';
+                            
+                            // Hapus file jika terjadi error
+                            if (file_exists($targetPath)) {
+                                unlink($targetPath);
+                            }
+                        }
+                    } else {
+                        $message = 'Gagal mengupload file foto profil.';
+                        $messageType = 'error';
+                    }
+                }
+            }
+        } else {
+            $message = 'Format file tidak didukung. Hanya JPG, PNG, dan GIF yang diperbolehkan.';
+            $messageType = 'error';
+        }
+    } else {
+        $message = 'Silakan pilih file foto profil terlebih dahulu.';
+        $messageType = 'error';
+    }
+}
+
+// Check untuk pesan dari redirect
+if (isset($_GET['avatar_updated']) && $_GET['avatar_updated'] == '1') {
+    $message = 'Foto profil berhasil diperbarui!';
+    $messageType = 'success';
+}
+
+if (isset($_GET['deleted_lf']) && $_GET['deleted_lf'] == '1') {
+    $message = 'Laporan Lost & Found berhasil dihapus!';
+    $messageType = 'success';
+}
+
+if (isset($_GET['deleted_activity']) && $_GET['deleted_activity'] == '1') {
+    $message = 'Kegiatan berhasil dihapus!';
+    $messageType = 'success';
+}
+
 // Handle Lost & Found form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_lost_found'])) {
     $data = [
@@ -117,6 +283,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_activity'])) {
     }
 }
 
+// Get updated user data for avatar display
+$user = $auth->getCurrentUser();
+
 // Get categories
 $lostFoundCategoriesQuery = "SELECT * FROM categories WHERE type = 'lost_found'";
 $lostFoundCategoriesStmt = $db->prepare($lostFoundCategoriesQuery);
@@ -203,7 +372,15 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
         <div class="container">
             <div class="profile-info">
                 <div class="profile-avatar">
-                    <img src="/placeholder.svg?height=120&width=120" alt="Profile Avatar">
+                    <?php if (!empty($user['avatar']) && file_exists('uploads/avatars/' . $user['avatar'])): ?>
+                        <img src="uploads/avatars/<?= htmlspecialchars($user['avatar']) ?>" alt="Profile Avatar" id="current-avatar">
+                    <?php else: ?>
+                        <img src="assets/images/default-avatar.png" alt="Profile Avatar" id="current-avatar" 
+                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiBmaWxsPSIjRjhGOUZBIi8+CjxjaXJjbGUgY3g9IjYwIiBjeT0iNDAiIHI9IjIwIiBmaWxsPSIjN0Y4QzhEIi8+CjxwYXRoIGQ9Ik0yMCA5NUMyMCA4MC4wODc2IDMyLjA4NzYgNjggNDcgNjhINzNDODcuOTEyNCA2OCAxMDAgODAuMDg3NiAxMDAgOTVWMTIwSDIwVjk1WiIgZmlsbD0iIzdGOEM4RCIvPgo8L3N2Zz4K';">
+                    <?php endif; ?>
+                    <button class="change-avatar-btn" onclick="openAvatarModal()" title="Ubah Foto Profil">
+                        <i class="fas fa-camera"></i>
+                    </button>
                 </div>
                 <div class="profile-details">
                     <h1><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></h1>
@@ -265,6 +442,12 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
                     <?php else: ?>
                         <?php foreach ($userLostFound as $item): ?>
                             <div class="profile-item">
+                                <div class="item-actions-overlay">
+                                    <button class="action-btn delete-btn" onclick="deleteItem(<?= $item['id'] ?>, 'lost-found', '<?= htmlspecialchars($item['title']) ?>')" title="Hapus">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                
                                 <div class="item-image">
                                     <?php if ($item['image']): ?>
                                         <img src="<?= htmlspecialchars($item['image']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
@@ -321,6 +504,12 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
                     <?php else: ?>
                         <?php foreach ($userActivities as $activity): ?>
                             <div class="profile-item">
+                                <div class="item-actions-overlay">
+                                    <button class="action-btn delete-btn" onclick="deleteItem(<?= $activity['id'] ?>, 'activity', '<?= htmlspecialchars($activity['title']) ?>')" title="Hapus">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                
                                 <div class="item-image">
                                     <?php if ($activity['image']): ?>
                                         <img src="<?= htmlspecialchars($activity['image']) ?>" alt="<?= htmlspecialchars($activity['title']) ?>">
@@ -355,6 +544,107 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
             </div>
         </div>
     </section>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="delete-modal">
+        <div class="modal-content delete-modal-content">
+            <div class="modal-header">
+                <h2>Konfirmasi Hapus</h2>
+                <button onclick="closeModal('delete-modal')" class="close-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="delete-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Apakah Anda yakin?</h3>
+                    <p>Anda akan menghapus "<span id="delete-item-title"></span>"</p>
+                    <p><strong>Tindakan ini tidak dapat dibatalkan!</strong></p>
+                </div>
+                
+                <form id="delete-form" method="POST" style="display: none;">
+                    <input type="hidden" id="delete-item-id" name="item_id" value="">
+                    <input type="hidden" id="delete-action-type" name="" value="1">
+                </form>
+                
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal('delete-modal')" class="btn-secondary">
+                        <i class="fas fa-times"></i>
+                        Batal
+                    </button>
+                    <button type="button" onclick="confirmDelete()" class="btn-danger">
+                        <i class="fas fa-trash"></i>
+                        Ya, Hapus
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Avatar Change Modal -->
+    <div class="modal" id="avatar-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ubah Foto Profil</h2>
+                <button onclick="closeModal('avatar-modal')" class="close-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="modal-form" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="change_avatar" value="1">
+                
+                <div class="avatar-upload-section">
+                    <div class="current-avatar-preview">
+                        <?php if (!empty($user['avatar']) && file_exists('uploads/avatars/' . $user['avatar'])): ?>
+                            <img src="uploads/avatars/<?= htmlspecialchars($user['avatar']) ?>" alt="Current Avatar" id="current-avatar-preview">
+                        <?php else: ?>
+                            <div class="no-avatar-placeholder" id="current-avatar-preview">
+                                <i class="fas fa-user"></i>
+                                <span>Belum ada foto</span>
+                            </div>
+                        <?php endif; ?>
+                        <div class="avatar-overlay">
+                            <i class="fas fa-camera"></i>
+                            <span>Foto Saat Ini</span>
+                        </div>
+                    </div>
+                    
+                    <div class="arrow-separator">
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                    
+                    <div class="new-avatar-preview" id="new-avatar-preview" style="display: none;">
+                        <img id="new-avatar-img" src="" alt="New Avatar Preview">
+                        <div class="avatar-overlay">
+                            <i class="fas fa-check"></i>
+                            <span>Foto Baru</span>
+                        </div>
+                    </div>
+                    
+                    <div class="no-preview-placeholder" id="no-preview-placeholder">
+                        <i class="fas fa-image"></i>
+                        <span>Preview foto baru</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="avatar">Pilih Foto Profil Baru</label>
+                    <input type="file" id="avatar" name="avatar" accept="image/jpeg,image/jpg,image/png,image/gif" onchange="previewAvatar(this)" required>
+                    <small>Format: JPG, PNG, GIF. Maksimal 2MB. Foto akan dipotong menjadi persegi secara otomatis.</small>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal('avatar-modal')" class="btn-secondary">
+                        Batal
+                    </button>
+                    <button type="submit" class="btn-primary" id="save-avatar-btn" disabled>
+                        <i class="fas fa-save"></i>
+                        Simpan Foto
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Lost & Found Modal -->
     <div class="modal" id="lost-found-modal">
@@ -548,62 +838,248 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
     </footer>
 
     <script src="assets/js/main.js"></script>
-    <script src="assets/js/profile.js"></script>
+    
+    <!-- JavaScript untuk Profile -->
     <script>
-        // Tab functionality
-        document.querySelectorAll('.tab-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                const targetTab = button.dataset.tab;
+    let deleteItemData = {};
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // TAB FUNCTIONALITY
+        document.querySelectorAll('.tab-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const targetTab = this.getAttribute('data-tab');
                 
-                // Update active tab button
-                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                
-                // Update active tab content
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.remove('active');
-                    if (content.id === `${targetTab}-tab`) {
-                        content.classList.add('active');
-                    }
+                // Remove active dari semua tab
+                document.querySelectorAll('.tab-btn').forEach(function(b) { 
+                    b.classList.remove('active'); 
                 });
+                document.querySelectorAll('.tab-content').forEach(function(c) { 
+                    c.classList.remove('active'); 
+                });
+                
+                // Add active ke tab yang diklik
+                this.classList.add('active');
+                const targetContent = document.getElementById(targetTab + '-tab');
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
             });
         });
         
-        // Modal functions
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('active');
-        }
+        // MODAL FUNCTIONALITY
+        document.querySelectorAll('.close-modal').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const modal = this.closest('.modal');
+                if (modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
         
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-        }
-        
-        function previewImage(input, previewId) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const imgElement = document.querySelector(`#${previewId} img`);
-                    imgElement.src = e.target.result;
-                    document.getElementById(previewId).style.display = 'block';
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-        
-        function removeImage(inputId, previewId) {
-            document.getElementById(inputId).value = '';
-            document.getElementById(previewId).style.display = 'none';
-        }
-        
-        // Close modal when clicking outside
         window.addEventListener('click', function(e) {
             if (e.target.classList.contains('modal')) {
                 e.target.classList.remove('active');
             }
         });
+        
+        // AVATAR UPLOAD
+        const avatarInput = document.getElementById('avatar');
+        if (avatarInput) {
+            avatarInput.addEventListener('change', function() {
+                previewAvatar(this);
+            });
+        }
+    });
+
+    // GLOBAL FUNCTIONS
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.add('active');
+        }
+    }
+
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    function openAvatarModal() {
+        const form = document.querySelector('#avatar-modal form');
+        if (form) form.reset();
+        
+        const newPreview = document.getElementById('new-avatar-preview');
+        const placeholder = document.getElementById('no-preview-placeholder');
+        const saveBtn = document.getElementById('save-avatar-btn');
+        
+        if (newPreview) newPreview.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+        if (saveBtn) saveBtn.disabled = true;
+        
+        openModal('avatar-modal');
+    }
+
+    function previewAvatar(input) {
+        const newPreview = document.getElementById('new-avatar-preview');
+        const newAvatarImg = document.getElementById('new-avatar-img');
+        const placeholder = document.getElementById('no-preview-placeholder');
+        const saveBtn = document.getElementById('save-avatar-btn');
+        
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            if (!validTypes.includes(file.type)) {
+                alert('Hanya file gambar (JPG, PNG, GIF) yang diperbolehkan!');
+                input.value = '';
+                return;
+            }
+            
+            const maxSize = 2 * 1024 * 1024;
+            if (file.size > maxSize) {
+                alert('Ukuran file terlalu besar! Maksimal 2MB.');
+                input.value = '';
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (newAvatarImg) newAvatarImg.src = e.target.result;
+                if (newPreview) newPreview.style.display = 'block';
+                if (placeholder) placeholder.style.display = 'none';
+                if (saveBtn) saveBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function previewImage(input, previewId) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById(previewId);
+                const img = preview ? preview.querySelector('img') : null;
+                if (img) {
+                    img.src = e.target.result;
+                    preview.style.display = 'block';
+                }
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function removeImage(inputId, previewId) {
+        const input = document.getElementById(inputId);
+        const preview = document.getElementById(previewId);
+        
+        if (input) input.value = '';
+        if (preview) preview.style.display = 'none';
+    }
+
+    // DELETE FUNCTIONALITY
+    function deleteItem(itemId, itemType, itemTitle) {
+        // Store delete data
+        deleteItemData = {
+            id: itemId,
+            type: itemType,
+            title: itemTitle
+        };
+        
+        // Update modal content
+        document.getElementById('delete-item-title').textContent = itemTitle;
+        document.getElementById('delete-item-id').value = itemId;
+        
+        // Set correct action name
+        const actionInput = document.getElementById('delete-action-type');
+        if (itemType === 'lost-found') {
+            actionInput.name = 'delete_lost_found';
+        } else {
+            actionInput.name = 'delete_activity';
+        }
+        
+        // Show delete modal
+        openModal('delete-modal');
+    }
+
+    function confirmDelete() {
+        // Show loading state
+        const deleteBtn = document.querySelector('.btn-danger');
+        const originalText = deleteBtn.innerHTML;
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menghapus...';
+        deleteBtn.disabled = true;
+        
+        // Submit form
+        document.getElementById('delete-form').submit();
+    }
     </script>
+
+    <!-- Alert untuk pesan berhasil/error (TANPA reload) -->
     <?php if ($message): ?>
-        <?= $auth->showAlert($message, $messageType) ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const alertType = '<?= $messageType ?>';
+                const alertMessage = <?= json_encode($message) ?>;
+                
+                if (alertType === 'success') {
+                    showCustomNotification('✅ ' + alertMessage, 'success');
+                } else {
+                    showCustomNotification('❌ ' + alertMessage, 'error');
+                }
+            });
+            
+            function showCustomNotification(message, type) {
+                // Buat notifikasi custom yang tidak berulang
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 100px;
+                    right: 20px;
+                    background: ${type === 'success' ? '#2ecc71' : '#e74c3c'};
+                    color: white;
+                    padding: 1rem 1.5rem;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 9999;
+                    animation: slideIn 0.3s ease;
+                    max-width: 400px;
+                    font-weight: 500;
+                `;
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                // Auto remove setelah 3 detik
+                setTimeout(() => {
+                    notification.style.animation = 'slideOut 0.3s ease forwards';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }, 3000);
+                
+                // Click to dismiss
+                notification.addEventListener('click', () => {
+                    notification.remove();
+                });
+            }
+            
+            // Add CSS animations
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        </script>
     <?php endif; ?>
 </body>
 </html>

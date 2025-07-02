@@ -198,7 +198,7 @@ $activities = $activitiesStmt->fetchAll();
                     </div>
                 <?php else: ?>
                     <?php foreach ($activities as $activity): ?>
-                        <div class="activity-item">
+                        <div class="activity-item" data-id="<?= $activity['id'] ?>" onclick="showActivityDetail(<?= $activity['id'] ?>)">
                             <div class="activity-image">
                                 <?php if ($activity['image']): ?>
                                     <img src="<?= htmlspecialchars($activity['image']) ?>" alt="<?= htmlspecialchars($activity['title']) ?>">
@@ -232,12 +232,45 @@ $activities = $activitiesStmt->fetchAll();
                                 <p class="activity-description"><?= htmlspecialchars(substr($activity['description'], 0, 150)) ?>...</p>
                                 <div class="activity-organizer">oleh <?= htmlspecialchars($activity['user_name']) ?></div>
                             </div>
+
+                            <!-- Hidden data untuk modal -->
+                            <script type="application/json" class="activity-data">
+                                {
+                                    "id": <?= $activity['id'] ?>,
+                                    "title": <?= json_encode($activity['title']) ?>,
+                                    "description": <?= json_encode($activity['description']) ?>,
+                                    "category_name": <?= json_encode($activity['category_name']) ?>,
+                                    "event_date": <?= json_encode($activity['event_date']) ?>,
+                                    "event_time": <?= json_encode($activity['event_time']) ?>,
+                                    "location": <?= json_encode($activity['location']) ?>,
+                                    "organizer": <?= json_encode($activity['organizer']) ?>,
+                                    "user_name": <?= json_encode($activity['user_name']) ?>,
+                                    "contact_info": <?= json_encode($activity['contact_info']) ?>,
+                                    "image": <?= json_encode($activity['image'] ?? '') ?>,
+                                    "created_at": <?= json_encode($activity['created_at']) ?>
+                                }
+                            </script>
                         </div>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </div>
         </div>
     </section>
+
+    <!-- Detail Modal -->
+    <div class="modal" id="detail-modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="detail-modal-title">Detail Kegiatan</h2>
+                <button onclick="closeModal('detail-modal')" class="close-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="detail-modal-body">
+                <!-- Content akan diisi oleh JavaScript -->
+            </div>
+        </div>
+    </div>
 
     <!-- Add Button (only for logged in users) -->
     <?php if ($user): ?>
@@ -365,40 +398,14 @@ $activities = $activitiesStmt->fetchAll();
 
     <script src="assets/js/main.js"></script>
     <script src="assets/js/activities.js"></script>
-    <script>
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('active');
-        }
-        
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-        }
-        
-        function previewImage(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('preview-img').src = e.target.result;
-                    document.getElementById('image-preview').style.display = 'block';
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-        
-        function removeImage() {
-            document.getElementById('image').value = '';
-            document.getElementById('image-preview').style.display = 'none';
-        }
-        
-        // Close modal when clicking outside
-        window.addEventListener('click', function(e) {
-            if (e.target.classList.contains('modal')) {
-                e.target.classList.remove('active');
-            }
-        });
-    </script>
     <?php if ($message): ?>
-        <?= $auth->showAlert($message, $messageType) ?>
+        <script>
+            // Pass PHP message to JavaScript
+            window.phpMessage = {
+                text: <?= json_encode($message) ?>,
+                type: '<?= $messageType ?>'
+            };
+        </script>
     <?php endif; ?>
 </body>
 </html>
