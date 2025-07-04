@@ -12,6 +12,144 @@ $db = $database->getConnection();
 $message = '';
 $messageType = '';
 
+// Handle edit lost & found item
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_lost_found'])) {
+    $itemId = $_POST['item_id'] ?? 0;
+    
+    if ($itemId > 0) {
+        // Check if item belongs to current user
+        $checkQuery = "SELECT * FROM lost_found_items WHERE id = ? AND user_id = ?";
+        $checkStmt = $db->prepare($checkQuery);
+        $checkStmt->execute([$itemId, $user['id']]);
+        $item = $checkStmt->fetch();
+        
+        if ($item) {
+            $data = [
+                'title' => $_POST['title'] ?? '',
+                'description' => $_POST['description'] ?? '',
+                'type' => $_POST['type'] ?? '',
+                'category_id' => $_POST['category_id'] ?? '',
+                'location' => $_POST['location'] ?? '',
+                'date_occurred' => $_POST['date_occurred'] ?? ''
+            ];
+            
+            if (empty($data['title']) || empty($data['description']) || empty($data['type']) || 
+                empty($data['category_id']) || empty($data['location']) || empty($data['date_occurred'])) {
+                $message = 'Semua field wajib diisi';
+                $messageType = 'error';
+            } else {
+                // Handle image upload
+                $imagePath = $item['image']; // Keep existing image by default
+                if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+                    $uploadDir = 'uploads/lost-found/';
+                    $fileExtension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+                    $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+                    
+                    if (in_array($fileExtension, $allowedExtensions)) {
+                        // Delete old image if exists
+                        if (!empty($item['image']) && file_exists($item['image'])) {
+                            unlink($item['image']);
+                        }
+                        
+                        $fileName = uniqid() . '.' . $fileExtension;
+                        $targetPath = $uploadDir . $fileName;
+                        
+                        if (move_uploaded_file($_FILES['image']['tmp_name'], $targetPath)) {
+                            $imagePath = $targetPath;
+                        }
+                    }
+                }
+                
+                // Update database
+                $updateQuery = "UPDATE lost_found_items SET title = ?, description = ?, type = ?, category_id = ?, location = ?, date_occurred = ?, image = ? WHERE id = ? AND user_id = ?";
+                $updateStmt = $db->prepare($updateQuery);
+                
+                if ($updateStmt->execute([$data['title'], $data['description'], $data['type'], $data['category_id'], 
+                                         $data['location'], $data['date_occurred'], $imagePath, $itemId, $user['id']])) {
+                    header('Location: profile.php?edited_lf=1');
+                    exit;
+                } else {
+                    $message = 'Gagal mengupdate laporan';
+                    $messageType = 'error';
+                }
+            }
+        } else {
+            $message = 'Laporan tidak ditemukan atau Anda tidak memiliki akses';
+            $messageType = 'error';
+        }
+    }
+}
+
+// Handle edit activity
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_activity'])) {
+    $itemId = $_POST['item_id'] ?? 0;
+    
+    if ($itemId > 0) {
+        // Check if activity belongs to current user
+        $checkQuery = "SELECT * FROM activities WHERE id = ? AND user_id = ?";
+        $checkStmt = $db->prepare($checkQuery);
+        $checkStmt->execute([$itemId, $user['id']]);
+        $activity = $checkStmt->fetch();
+        
+        if ($activity) {
+            $data = [
+                'title' => $_POST['title'] ?? '',
+                'description' => $_POST['description'] ?? '',
+                'category_id' => $_POST['category_id'] ?? '',
+                'event_date' => $_POST['event_date'] ?? '',
+                'event_time' => $_POST['event_time'] ?? '',
+                'location' => $_POST['location'] ?? '',
+                'organizer' => $_POST['organizer'] ?? ''
+            ];
+            
+            if (empty($data['title']) || empty($data['description']) || empty($data['category_id']) || 
+                empty($data['event_date']) || empty($data['event_time']) || empty($data['location']) || empty($data['organizer'])) {
+                $message = 'Semua field wajib diisi';
+                $messageType = 'error';
+            } else {
+                // Handle image upload
+                $imagePath = $activity['image']; // Keep existing image by default
+                if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+                    $uploadDir = 'uploads/activities/';
+                    $fileExtension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+                    $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+                    
+                    if (in_array($fileExtension, $allowedExtensions)) {
+                        // Delete old image if exists
+                        if (!empty($activity['image']) && file_exists($activity['image'])) {
+                            unlink($activity['image']);
+                        }
+                        
+                        $fileName = uniqid() . '.' . $fileExtension;
+                        $targetPath = $uploadDir . $fileName;
+                        
+                        if (move_uploaded_file($_FILES['image']['tmp_name'], $targetPath)) {
+                            $imagePath = $targetPath;
+                        }
+                    }
+                }
+                
+                // Update database
+                $updateQuery = "UPDATE activities SET title = ?, description = ?, category_id = ?, event_date = ?, event_time = ?, location = ?, organizer = ?, image = ? WHERE id = ? AND user_id = ?";
+                $updateStmt = $db->prepare($updateQuery);
+                
+                if ($updateStmt->execute([$data['title'], $data['description'], $data['category_id'], 
+                                         $data['event_date'], $data['event_time'], $data['location'], $data['organizer'], 
+                                         $imagePath, $itemId, $user['id']])) {
+                    header('Location: profile.php?edited_activity=1');
+                    exit;
+                } else {
+                    $message = 'Gagal mengupdate kegiatan';
+                    $messageType = 'error';
+                }
+            }
+        } else {
+            $message = 'Kegiatan tidak ditemukan atau Anda tidak memiliki akses';
+            $messageType = 'error';
+        }
+    }
+}
+
 // Handle delete lost & found item
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_lost_found'])) {
     $itemId = $_POST['item_id'] ?? 0;
@@ -175,6 +313,16 @@ if (isset($_GET['deleted_lf']) && $_GET['deleted_lf'] == '1') {
 
 if (isset($_GET['deleted_activity']) && $_GET['deleted_activity'] == '1') {
     $message = 'Kegiatan berhasil dihapus!';
+    $messageType = 'success';
+}
+
+if (isset($_GET['edited_lf']) && $_GET['edited_lf'] == '1') {
+    $message = 'Laporan Lost & Found berhasil diperbarui!';
+    $messageType = 'success';
+}
+
+if (isset($_GET['edited_activity']) && $_GET['edited_activity'] == '1') {
+    $message = 'Kegiatan berhasil diperbarui!';
     $messageType = 'success';
 }
 
@@ -441,8 +589,11 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
                         </div>
                     <?php else: ?>
                         <?php foreach ($userLostFound as $item): ?>
-                            <div class="profile-item">
+                            <div class="profile-item" data-id="<?= $item['id'] ?>" data-type="lost-found">
                                 <div class="item-actions-overlay">
+                                    <button class="action-btn edit-btn" onclick="editItem(<?= $item['id'] ?>, 'lost-found')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
                                     <button class="action-btn delete-btn" onclick="deleteItem(<?= $item['id'] ?>, 'lost-found', '<?= htmlspecialchars($item['title']) ?>')" title="Hapus">
                                         <i class="fas fa-trash"></i>
                                     </button>
@@ -475,6 +626,20 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
                                     </div>
                                     <p class="item-description"><?= htmlspecialchars(substr($item['description'], 0, 100)) ?>...</p>
                                 </div>
+                                
+                                <!-- Hidden data for editing -->
+                                <script type="application/json" class="item-edit-data">
+                                    {
+                                        "id": <?= $item['id'] ?>,
+                                        "title": <?= json_encode($item['title']) ?>,
+                                        "description": <?= json_encode($item['description']) ?>,
+                                        "type": <?= json_encode($item['type']) ?>,
+                                        "category_id": <?= $item['category_id'] ?>,
+                                        "location": <?= json_encode($item['location']) ?>,
+                                        "date_occurred": <?= json_encode($item['date_occurred']) ?>,
+                                        "image": <?= json_encode($item['image'] ?? '') ?>
+                                    }
+                                </script>
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -503,8 +668,11 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
                         </div>
                     <?php else: ?>
                         <?php foreach ($userActivities as $activity): ?>
-                            <div class="profile-item">
+                            <div class="profile-item" data-id="<?= $activity['id'] ?>" data-type="activity">
                                 <div class="item-actions-overlay">
+                                    <button class="action-btn edit-btn" onclick="editItem(<?= $activity['id'] ?>, 'activity')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
                                     <button class="action-btn delete-btn" onclick="deleteItem(<?= $activity['id'] ?>, 'activity', '<?= htmlspecialchars($activity['title']) ?>')" title="Hapus">
                                         <i class="fas fa-trash"></i>
                                     </button>
@@ -537,6 +705,21 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
                                     </div>
                                     <p class="item-description"><?= htmlspecialchars(substr($activity['description'], 0, 100)) ?>...</p>
                                 </div>
+                                
+                                <!-- Hidden data for editing -->
+                                <script type="application/json" class="item-edit-data">
+                                    {
+                                        "id": <?= $activity['id'] ?>,
+                                        "title": <?= json_encode($activity['title']) ?>,
+                                        "description": <?= json_encode($activity['description']) ?>,
+                                        "category_id": <?= $activity['category_id'] ?>,
+                                        "event_date": <?= json_encode($activity['event_date']) ?>,
+                                        "event_time": <?= json_encode($activity['event_time']) ?>,
+                                        "location": <?= json_encode($activity['location']) ?>,
+                                        "organizer": <?= json_encode($activity['organizer']) ?>,
+                                        "image": <?= json_encode($activity['image'] ?? '') ?>
+                                    }
+                                </script>
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -578,6 +761,166 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Edit Lost & Found Modal -->
+    <div class="modal" id="edit-lost-found-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Laporan Lost & Found</h2>
+                <button onclick="closeModal('edit-lost-found-modal')" class="close-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="modal-form" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="edit_lost_found" value="1">
+                <input type="hidden" name="item_id" id="edit-lf-id" value="">
+                
+                <div class="form-group">
+                    <label for="edit_lf_type">Jenis Laporan</label>
+                    <select id="edit_lf_type" name="type" required>
+                        <option value="">Pilih jenis laporan</option>
+                        <option value="hilang">Barang Hilang</option>
+                        <option value="ditemukan">Barang Ditemukan</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_lf_title">Nama Barang</label>
+                    <input type="text" id="edit_lf_title" name="title" placeholder="Contoh: Laptop ASUS ROG" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_lf_category_id">Kategori</label>
+                    <select id="edit_lf_category_id" name="category_id" required>
+                        <option value="">Pilih kategori</option>
+                        <?php foreach ($lostFoundCategories as $category): ?>
+                            <option value="<?= $category['id'] ?>"><?= htmlspecialchars($category['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_lf_description">Deskripsi</label>
+                    <textarea id="edit_lf_description" name="description" rows="4" placeholder="Jelaskan ciri-ciri barang secara detail..." required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_lf_location">Lokasi</label>
+                    <input type="text" id="edit_lf_location" name="location" placeholder="Contoh: Perpustakaan Lantai 2" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_lf_date_occurred">Tanggal Kejadian</label>
+                    <input type="date" id="edit_lf_date_occurred" name="date_occurred" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_lf_image" class="optional">Foto Barang (Opsional - kosongkan jika tidak ingin mengubah)</label>
+                    <input type="file" id="edit_lf_image" name="image" accept="image/*" onchange="previewImage(this, 'edit-lf-preview')">
+                    <div class="current-image" id="edit-lf-current-image" style="display: none;">
+                        <p>Gambar saat ini:</p>
+                        <img id="edit-lf-current-img" src="" alt="Current image" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                    </div>
+                    <div class="image-preview" id="edit-lf-preview" style="display: none;">
+                        <img id="edit-lf-preview-img" src="" alt="Preview">
+                        <br>
+                        <button type="button" class="remove-image" onclick="removeImage('edit_lf_image', 'edit-lf-preview')">Hapus Foto</button>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal('edit-lost-found-modal')" class="btn-secondary">
+                        Batal
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save"></i>
+                        Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Activity Modal -->
+    <div class="modal" id="edit-activity-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Kegiatan</h2>
+                <button onclick="closeModal('edit-activity-modal')" class="close-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="modal-form" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="edit_activity" value="1">
+                <input type="hidden" name="item_id" id="edit-act-id" value="">
+                
+                <div class="form-group">
+                    <label for="edit_act_title">Judul Kegiatan</label>
+                    <input type="text" id="edit_act_title" name="title" placeholder="Contoh: Workshop Python Programming" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_act_category_id">Kategori</label>
+                    <select id="edit_act_category_id" name="category_id" required>
+                        <option value="">Pilih kategori</option>
+                        <?php foreach ($activityCategories as $category): ?>
+                            <option value="<?= $category['id'] ?>"><?= htmlspecialchars($category['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_act_description">Deskripsi</label>
+                    <textarea id="edit_act_description" name="description" rows="4" placeholder="Jelaskan detail kegiatan, materi yang akan dibahas, dan informasi penting lainnya..." required></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit_act_event_date">Tanggal</label>
+                        <input type="date" id="edit_act_event_date" name="event_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_act_event_time">Waktu</label>
+                        <input type="time" id="edit_act_event_time" name="event_time" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_act_location">Lokasi</label>
+                    <input type="text" id="edit_act_location" name="location" placeholder="Contoh: Auditorium Utama STIS" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_act_organizer">Penyelenggara</label>
+                    <input type="text" id="edit_act_organizer" name="organizer" placeholder="Contoh: Himpunan Mahasiswa Statistika" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_act_image" class="optional">Poster/Gambar Kegiatan (Opsional - kosongkan jika tidak ingin mengubah)</label>
+                    <input type="file" id="edit_act_image" name="image" accept="image/*" onchange="previewImage(this, 'edit-act-preview')">
+                    <div class="current-image" id="edit-act-current-image" style="display: none;">
+                        <p>Gambar saat ini:</p>
+                        <img id="edit-act-current-img" src="" alt="Current image" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                    </div>
+                    <div class="image-preview" id="edit-act-preview" style="display: none;">
+                        <img id="edit-act-preview-img" src="" alt="Preview">
+                        <br>
+                        <button type="button" class="remove-image" onclick="removeImage('edit_act_image', 'edit-act-preview')">Hapus Foto</button>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal('edit-activity-modal')" class="btn-secondary">
+                        Batal
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save"></i>
+                        Simpan Perubahan
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -975,6 +1318,87 @@ $resolvedItems = count(array_filter($userLostFound, function($item) {
         const preview = document.getElementById(previewId);
         
         if (input) input.value = '';
+        if (preview) preview.style.display = 'none';
+    }
+
+    // EDIT FUNCTIONALITY
+    function editItem(itemId, itemType) {
+        const itemElement = document.querySelector(`.profile-item[data-id="${itemId}"][data-type="${itemType}"]`);
+        if (!itemElement) {
+            alert('Item tidak ditemukan');
+            return;
+        }
+        
+        const itemDataScript = itemElement.querySelector('.item-edit-data');
+        if (!itemDataScript) {
+            alert('Data item tidak ditemukan');
+            return;
+        }
+        
+        try {
+            const itemData = JSON.parse(itemDataScript.textContent);
+            
+            if (itemType === 'lost-found') {
+                populateEditLostFoundForm(itemData);
+                openModal('edit-lost-found-modal');
+            } else if (itemType === 'activity') {
+                populateEditActivityForm(itemData);
+                openModal('edit-activity-modal');
+            }
+        } catch (error) {
+            console.error('Error parsing item data:', error);
+            alert('Terjadi kesalahan saat membaca data item');
+        }
+    }
+
+    function populateEditLostFoundForm(data) {
+        document.getElementById('edit-lf-id').value = data.id;
+        document.getElementById('edit_lf_title').value = data.title;
+        document.getElementById('edit_lf_description').value = data.description;
+        document.getElementById('edit_lf_type').value = data.type;
+        document.getElementById('edit_lf_category_id').value = data.category_id;
+        document.getElementById('edit_lf_location').value = data.location;
+        document.getElementById('edit_lf_date_occurred').value = data.date_occurred;
+        
+        // Show current image if exists
+        const currentImageDiv = document.getElementById('edit-lf-current-image');
+        const currentImg = document.getElementById('edit-lf-current-img');
+        
+        if (data.image && data.image.trim() !== '') {
+            currentImg.src = data.image;
+            currentImageDiv.style.display = 'block';
+        } else {
+            currentImageDiv.style.display = 'none';
+        }
+        
+        // Hide new image preview
+        const preview = document.getElementById('edit-lf-preview');
+        if (preview) preview.style.display = 'none';
+    }
+
+    function populateEditActivityForm(data) {
+        document.getElementById('edit-act-id').value = data.id;
+        document.getElementById('edit_act_title').value = data.title;
+        document.getElementById('edit_act_description').value = data.description;
+        document.getElementById('edit_act_category_id').value = data.category_id;
+        document.getElementById('edit_act_event_date').value = data.event_date;
+        document.getElementById('edit_act_event_time').value = data.event_time;
+        document.getElementById('edit_act_location').value = data.location;
+        document.getElementById('edit_act_organizer').value = data.organizer;
+        
+        // Show current image if exists
+        const currentImageDiv = document.getElementById('edit-act-current-image');
+        const currentImg = document.getElementById('edit-act-current-img');
+        
+        if (data.image && data.image.trim() !== '') {
+            currentImg.src = data.image;
+            currentImageDiv.style.display = 'block';
+        } else {
+            currentImageDiv.style.display = 'none';
+        }
+        
+        // Hide new image preview
+        const preview = document.getElementById('edit-act-preview');
         if (preview) preview.style.display = 'none';
     }
 

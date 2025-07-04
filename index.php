@@ -173,96 +173,107 @@ function getItemIcon($categoryName, $type) {
     <section class="recent-posts">
         <div class="container">
             <h2>Postingan Terbaru</h2>
-            <div class="slider-container">
-                <div class="posts-slider">
-                    <?php foreach ($lostFoundItems as $item): ?>
-                        <?php 
-                        $hasImage = !empty($item['image']) && file_exists($item['image']);
-                        $icon = getItemIcon($item['category_name'], 'lost_found');
-                        ?>
-                        <div class="post-card" onclick="window.location.href='lost-found.php'">
-                            <div class="post-image <?= $hasImage ? 'has-image' : '' ?>">
-                                <?php if ($hasImage): ?>
-                                    <img src="<?= htmlspecialchars($item['image']) ?>" 
-                                         alt="<?= htmlspecialchars($item['title']) ?>" 
-                                         loading="lazy"
-                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    <div class="fallback-icon" style="display: none;">
-                                        <i class="fas fa-<?= $icon ?>"></i>
+            <div id="recent-posts">
+                <?php if (count($lostFoundItems) > 0 || count($activities) > 0): ?>
+                    <div class="slider-container">
+                        <div class="slider-wrapper">
+                            <div class="posts-slider" id="posts-slider">
+                                <?php 
+                                // Combine all posts
+                                $allPosts = [];
+                                
+                                // Add lost & found items
+                                foreach ($lostFoundItems as $item) {
+                                    $allPosts[] = [
+                                        'type' => 'lost-found',
+                                        'data' => $item,
+                                        'category_display' => $item['type'] === 'hilang' ? 'Barang Hilang' : 'Barang Ditemukan',
+                                        'category_class' => $item['type'] === 'hilang' ? 'lost' : 'found',
+                                        'date' => $item['date_occurred'],
+                                        'link' => 'lost-found.php'
+                                    ];
+                                }
+                                
+                                // Add activities
+                                foreach ($activities as $activity) {
+                                    $allPosts[] = [
+                                        'type' => 'activity',
+                                        'data' => $activity,
+                                        'category_display' => $activity['category_name'],
+                                        'category_class' => 'activity',
+                                        'date' => $activity['event_date'],
+                                        'link' => 'activities.php'
+                                    ];
+                                }
+                                
+                                // Sort by date (newest first)
+                                usort($allPosts, function($a, $b) {
+                                    return strtotime($b['date']) - strtotime($a['date']);
+                                });
+                                
+                                // Display posts
+                                foreach ($allPosts as $post): 
+                                    $item = $post['data'];
+                                    $hasImage = !empty($item['image']) && file_exists($item['image']);
+                                    $icon = getItemIcon($item['category_name'], $post['type']);
+                                ?>
+                                    <div class="post-card" onclick="window.location.href='<?= $post['link'] ?>'">
+                                        <div class="post-image <?= $hasImage ? 'has-image' : '' ?>">
+                                            <?php if ($hasImage): ?>
+                                                <img src="<?= htmlspecialchars($item['image']) ?>" 
+                                                     alt="<?= htmlspecialchars($item['title']) ?>" 
+                                                     loading="lazy"
+                                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <div class="fallback-icon" style="display: none;">
+                                                    <i class="fas fa-<?= $icon ?>"></i>
+                                                </div>
+                                            <?php else: ?>
+                                                <i class="fas fa-<?= $icon ?>"></i>
+                                            <?php endif; ?>
+                                            <div class="post-type-badge <?= $post['type'] ?>">
+                                                <?= $post['type'] === 'lost-found' ? 'Lost & Found' : 'Kegiatan' ?>
+                                            </div>
+                                        </div>
+                                        <div class="post-content">
+                                            <div class="post-category <?= $post['category_class'] ?>">
+                                                <?= htmlspecialchars($post['category_display']) ?>
+                                            </div>
+                                            <h3 class="post-title"><?= htmlspecialchars($item['title']) ?></h3>
+                                            <div class="post-meta">
+                                                <div class="meta-item">
+                                                    <i class="fas fa-calendar"></i>
+                                                    <span><?= date('d M Y', strtotime($post['date'])) ?></span>
+                                                </div>
+                                                <div class="meta-item">
+                                                    <i class="fas fa-map-marker-alt"></i>
+                                                    <span><?= htmlspecialchars($item['location']) ?></span>
+                                                </div>
+                                                <div class="meta-item">
+                                                    <i class="fas fa-user"></i>
+                                                    <span><?= htmlspecialchars($item['first_name'] . ' ' . $item['last_name']) ?></span>
+                                                </div>
+                                            </div>
+                                            <p class="post-description"><?= htmlspecialchars(substr($item['description'], 0, 100)) ?>...</p>
+                                        </div>
                                     </div>
-                                <?php else: ?>
-                                    <i class="fas fa-<?= $icon ?>"></i>
-                                <?php endif; ?>
-                                <div class="post-type-badge lost-found">Lost & Found</div>
-                            </div>
-                            <div class="post-content">
-                                <div class="post-category <?= $item['type'] ?>">
-                                    <?= $item['type'] === 'hilang' ? 'Barang Hilang' : 'Barang Ditemukan' ?>
-                                </div>
-                                <h3 class="post-title"><?= htmlspecialchars($item['title']) ?></h3>
-                                <div class="post-meta">
-                                    <div class="meta-item">
-                                        <i class="fas fa-calendar"></i>
-                                        <span><?= date('d M Y', strtotime($item['date_occurred'])) ?></span>
-                                    </div>
-                                    <div class="meta-item">
-                                        <i class="fas fa-map-marker-alt"></i>
-                                        <span><?= htmlspecialchars($item['location']) ?></span>
-                                    </div>
-                                    <div class="meta-item">
-                                        <i class="fas fa-user"></i>
-                                        <span><?= htmlspecialchars($item['first_name'] . ' ' . $item['last_name']) ?></span>
-                                    </div>
-                                </div>
-                                <p class="post-description"><?= htmlspecialchars(substr($item['description'], 0, 100)) ?>...</p>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                    
-                    <?php foreach ($activities as $activity): ?>
-                        <?php 
-                        $hasImage = !empty($activity['image']) && file_exists($activity['image']);
-                        $icon = getItemIcon($activity['category_name'], 'activity');
-                        ?>
-                        <div class="post-card" onclick="window.location.href='activities.php'">
-                            <div class="post-image <?= $hasImage ? 'has-image' : '' ?>">
-                                <?php if ($hasImage): ?>
-                                    <img src="<?= htmlspecialchars($activity['image']) ?>" 
-                                         alt="<?= htmlspecialchars($activity['title']) ?>" 
-                                         loading="lazy"
-                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    <div class="fallback-icon" style="display: none;">
-                                        <i class="fas fa-<?= $icon ?>"></i>
-                                    </div>
-                                <?php else: ?>
-                                    <i class="fas fa-<?= $icon ?>"></i>
-                                <?php endif; ?>
-                                <div class="post-type-badge activity">Kegiatan</div>
-                            </div>
-                            <div class="post-content">
-                                <div class="post-category activity">
-                                    <?= htmlspecialchars($activity['category_name']) ?>
-                                </div>
-                                <h3 class="post-title"><?= htmlspecialchars($activity['title']) ?></h3>
-                                <div class="post-meta">
-                                    <div class="meta-item">
-                                        <i class="fas fa-calendar"></i>
-                                        <span><?= date('d M Y', strtotime($activity['event_date'])) ?></span>
-                                    </div>
-                                    <div class="meta-item">
-                                        <i class="fas fa-map-marker-alt"></i>
-                                        <span><?= htmlspecialchars($activity['location']) ?></span>
-                                    </div>
-                                    <div class="meta-item">
-                                        <i class="fas fa-user"></i>
-                                        <span><?= htmlspecialchars($activity['first_name'] . ' ' . $activity['last_name']) ?></span>
-                                    </div>
-                                </div>
-                                <p class="post-description"><?= htmlspecialchars(substr($activity['description'], 0, 100)) ?>...</p>
+                                <?php endforeach; ?>
                             </div>
                         </div>
-                    <?php endforeach; ?>
-                </div>
+                        <button class="slider-btn prev" id="prev-btn">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="slider-btn next" id="next-btn">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="slider-dots" id="slider-dots"></div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <h3>Belum Ada Postingan</h3>
+                        <p>Belum ada postingan terbaru untuk ditampilkan</p>
+                    </div>
+                <?php endif; ?>
             </div>
             <div class="view-more">
                 <a href="lost-found.php" class="btn-outline">Lihat Semua Lost & Found</a>

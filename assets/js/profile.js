@@ -302,7 +302,7 @@ function handleAvatarError(errorMessage) {
   const saveBtn = document.getElementById("save-avatar-btn")
   if (saveBtn) {
     saveBtn.innerHTML = '<i class="fas fa-save"></i> Simpan Foto'
-    saveBtn.disabled = false
+    saveBtn.disabled = false 
   }
   
   // Remove loading state from current avatar

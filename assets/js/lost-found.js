@@ -1,4 +1,4 @@
-// Lost & Found page functionality dengan Image Resize dan Detail Modal
+// Lost & Found page functionality dengan Live Search dan AJAX
 document.addEventListener("DOMContentLoaded", () => {
   // DOM elements
   const lostFoundContainer = document.querySelector(".grid-container")
@@ -9,62 +9,48 @@ document.addEventListener("DOMContentLoaded", () => {
   const addModal = document.getElementById("add-modal")
   const detailModal = document.getElementById("detail-modal")
   const addForm = document.querySelector(".modal-form")
+  const filterForm = document.querySelector(".filter-bar")
 
   // Modal controls
   const closeModalBtns = document.querySelectorAll(".close-modal")
 
-  let sampleLostFound = [] // Data dari server
   let currentItems = []
+  const searchTimeout = null
 
   // Initialize page
   init()
 
   function init() {
-    if (lostFoundContainer && lostFoundContainer.children.length > 0) {
-      // Jika sudah ada data dari server, ambil dari DOM
-      extractDataFromDOM()
-    } else {
-      // Jika belum ada data, load dari API
-      loadLostFoundItems()
-    }
+    // Load initial data
+    loadInitialData()
     setupEventListeners()
   }
 
-  function extractDataFromDOM() {
-    // Extract data dari card yang sudah ada di DOM
-    const existingCards = document.querySelectorAll('.lost-found-item')
-    existingCards.forEach(card => {
-      setupCardEvents(card)
-    })
-  }
-
-  function setupCardEvents(card) {
-    // Add click event untuk detail
-    card.addEventListener('click', function(e) {
-      // Jangan trigger jika klik button action atau contact
-      if (!e.target.closest('.action-btn') && !e.target.closest('.contact-btn')) {
-        const itemId = this.dataset.id
-        if (itemId) {
-          showItemDetail(itemId)
-        }
-      }
-    })
+  async function loadInitialData() {
+    await handleLiveSearch()
   }
 
   function setupEventListeners() {
-    // Search functionality - let PHP handle it
+    // Live search functionality
     if (searchInput) {
-      // Real-time search bisa diaktifkan jika diperlukan
-      // searchInput.addEventListener("input", debounce(handleFilter, 300))
+      searchInput.addEventListener("input", debounce(handleLiveSearch, 300))
     }
 
-    // Filter functionality - let PHP handle it
+    // Live filter functionality
     if (categoryFilter) {
-      // categoryFilter.addEventListener("change", handleFilter)
+      categoryFilter.addEventListener("change", handleLiveSearch)
     }
 
     if (statusFilter) {
-      // statusFilter.addEventListener("change", handleFilter)
+      statusFilter.addEventListener("change", handleLiveSearch)
+    }
+
+    // Prevent form submission
+    if (filterForm) {
+      filterForm.addEventListener("submit", (e) => {
+        e.preventDefault()
+        handleLiveSearch()
+      })
     }
 
     // Modal controls
@@ -87,27 +73,51 @@ document.addEventListener("DOMContentLoaded", () => {
         closeModals()
       }
     })
-
-    // Setup existing cards
-    setupExistingCards()
   }
 
-  function setupExistingCards() {
-    const existingCards = document.querySelectorAll('.lost-found-item')
-    existingCards.forEach(card => {
-      setupCardEvents(card)
-    })
+  async function handleLiveSearch() {
+    const searchTerm = searchInput ? searchInput.value.trim() : ""
+    const category = categoryFilter ? categoryFilter.value : ""
+    const type = statusFilter ? statusFilter.value : ""
+
+    try {
+      showLoading()
+
+      const params = new URLSearchParams()
+      if (searchTerm) params.append("search", searchTerm)
+      if (category) params.append("category", category)
+      if (type) params.append("type", type)
+
+      const response = await fetch(`api/lost-found/search.php?${params.toString()}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+
+      if (data && Array.isArray(data)) {
+        currentItems = data
+        displayItems(currentItems)
+      } else if (data && data.error) {
+        showError("Gagal memuat data: " + data.error)
+      } else {
+        displayItems([]) // Display empty state
+      }
+    } catch (error) {
+      console.error("Error in live search:", error)
+      showError("Gagal terhubung ke server: " + error.message)
+    } finally {
+      hideLoading()
+    }
   }
 
   async function loadLostFoundItems() {
     try {
       showLoading()
-      const response = await fetch("api/lost-found/index.php")
+      const response = await fetch("api/lost-found/search.php")
       const data = await response.json()
 
       if (response.ok) {
-        sampleLostFound = data
-        currentItems = [...data]
+        currentItems = data
         displayItems(currentItems)
       } else {
         showError("Gagal memuat data: " + (data.error || "Unknown error"))
@@ -140,11 +150,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Add event listeners to new cards
       const itemCards = lostFoundContainer.querySelectorAll(".lost-found-item")
-      itemCards.forEach(card => setupCardEvents(card))
-      
+      itemCards.forEach((card) => setupCardEvents(card))
     } catch (error) {
-      console.error('Error displaying items:', error)
-      showError('Gagal menampilkan data')
+      console.error("Error displaying items:", error)
+      showError("Gagal menampilkan data")
     }
   }
 
@@ -161,37 +170,78 @@ document.addEventListener("DOMContentLoaded", () => {
     const isOwner = currentUser && currentUser.id == item.user_id
 
     // Determine if we have a valid image
-    const hasImage = item.image && item.image.trim() !== ''
-    const imageClass = hasImage ? 'has-image' : ''
-    
+    const hasImage = item.image && item.image.trim() !== ""
+    const imageClass = hasImage ? "has-image" : ""
+
     // Clean phone number for WhatsApp
-    const cleanPhone = item.contact_info ? item.contact_info.replace(/[^0-9]/g, '') : ''
+    const cleanPhone = item.contact_info ? item.contact_info.replace(/[^0-9]/g, "") : ""
 
     // Get icon based on category
     const icon = getItemIcon(item.category_name)
 
+    // Escape JSON-unsafe characters
+    const escapedTitle = item.title.replace(/["'\\\n\r]/g, (match) => {
+      switch (match) {
+        case '"':
+          return "&quot;"
+        case "'":
+          return "&#39;"
+        case "\\":
+          return "\\\\"
+        case "\n":
+          return "\\n"
+        case "\r":
+          return "\\r"
+        default:
+          return match
+      }
+    })
+    const escapedDescription = item.description.replace(/["'\\\n\r]/g, (match) => {
+      switch (match) {
+        case '"':
+          return "&quot;"
+        case "'":
+          return "&#39;"
+        case "\\":
+          return "\\\\"
+        case "\n":
+          return "\\n"
+        case "\r":
+          return "\\r"
+        default:
+          return match
+      }
+    })
+
     return `
-      <div class="lost-found-item" data-id="${item.id}" onclick="showItemDetail(${item.id})">
-        ${isOwner ? `
+      <div class="lost-found-item" data-id="${item.id}" onclick="window.showItemDetail(${item.id})">
+        ${
+          isOwner
+            ? `
           <div class="item-actions-overlay">
-            <button class="action-btn edit-btn" onclick="event.stopPropagation(); editItem(${item.id}, 'lost-found')" title="Edit">
+            <button class="action-btn edit-btn" onclick="event.stopPropagation(); window.editItem(${item.id}, 'lost-found')" title="Edit">
               <i class="fas fa-edit"></i>
             </button>
-            <button class="action-btn delete-btn" onclick="event.stopPropagation(); deleteItem(${item.id}, 'lost-found')" title="Hapus">
+            <button class="action-btn delete-btn" onclick="event.stopPropagation(); window.deleteItem(${item.id}, 'lost-found')" title="Hapus">
               <i class="fas fa-trash"></i>
             </button>
           </div>
-        ` : ''}
+        `
+            : ""
+        }
         
         <div class="item-image ${imageClass}">
-          ${hasImage ? `
+          ${
+            hasImage
+              ? `
             <img src="${item.image}" 
                  alt="${item.title}" 
-                 loading="lazy"
-                 style="width: auto; height: 150px; object-fit: cover;">
-          ` : `
+                 loading="lazy">
+          `
+              : `
             <i class="fas fa-${icon} item-icon"></i>
-          `}
+          `
+          }
           
           <div class="item-status ${statusClass}">
             ${statusText}
@@ -240,15 +290,15 @@ document.addEventListener("DOMContentLoaded", () => {
         <script type="application/json" class="item-data">
           {
             "id": ${item.id},
-            "title": "${item.title.replace(/"/g, '\\"')}",
-            "description": "${item.description.replace(/"/g, '\\"')}",
+            "title": "${escapedTitle}",
+            "description": "${escapedDescription}",
             "type": "${item.type}",
             "category_name": "${item.category_name}",
             "location": "${item.location}",
             "date_occurred": "${item.date_occurred}",
             "user_name": "${item.user_name}",
             "contact_info": "${item.contact_info}",
-            "image": "${item.image || ''}",
+            "image": "${item.image || ""}",
             "created_at": "${item.created_at}"
           }
         </script>
@@ -256,22 +306,35 @@ document.addEventListener("DOMContentLoaded", () => {
     `
   }
 
+  function setupCardEvents(card) {
+    // Add click event untuk detail
+    card.addEventListener("click", function (e) {
+      // Jangan trigger jika klik button action atau contact
+      if (!e.target.closest(".action-btn") && !e.target.closest(".contact-btn")) {
+        const itemId = this.dataset.id
+        if (itemId) {
+          window.showItemDetail(itemId)
+        }
+      }
+    })
+  }
+
   function getItemIcon(category) {
     const iconMap = {
-      'elektronik': 'laptop',
-      'aksesoris': 'glasses',
-      'pakaian': 'tshirt',
-      'buku': 'book',
-      'alat tulis': 'pen',
-      'tas': 'briefcase',
-      'sepatu': 'shoe-prints',
-      'perhiasan': 'gem',
-      'kendaraan': 'car',
-      'lainnya': 'box'
+      elektronik: "laptop",
+      aksesoris: "glasses",
+      pakaian: "tshirt",
+      buku: "book",
+      "alat tulis": "pen",
+      tas: "briefcase",
+      sepatu: "shoe-prints",
+      perhiasan: "gem",
+      kendaraan: "car",
+      lainnya: "box",
     }
-    
+
     const normalizedCategory = category.toLowerCase()
-    return iconMap[normalizedCategory] || 'box'
+    return iconMap[normalizedCategory] || "box"
   }
 
   function openAddModal() {
@@ -290,18 +353,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (addForm) {
       addForm.reset()
       // Hide image preview
-      const imagePreview = document.getElementById('image-preview')
+      const imagePreview = document.getElementById("image-preview")
       if (imagePreview) {
-        imagePreview.style.display = 'none'
+        imagePreview.style.display = "none"
       }
     }
   }
 
   async function handleAddItem(e) {
-    e.preventDefault()
-    
+    // Remove e.preventDefault() to allow natural form submission to PHP
     // Let the form submit naturally to PHP handler
-    // The PHP code will handle the form submission and image resize
+    // The PHP code will handle the form submission and image processing
     return true
   }
 
@@ -352,27 +414,27 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Global functions for PHP integration
-  window.editItem = async function(id, type) {
-    console.log('Edit item:', id)
+  window.editItem = async (id, type) => {
+    console.log("Edit item:", id)
     // Implement edit functionality
   }
 
-  window.deleteItem = async function(id, type) {
+  window.deleteItem = async (id, type) => {
     if (!confirm("Apakah Anda yakin ingin menghapus item ini?")) {
       return
     }
-    console.log('Delete item:', id)
+    console.log("Delete item:", id)
     // Implement delete functionality
   }
 
-  window.openModal = function(modalId) {
+  window.openModal = (modalId) => {
     const modal = document.getElementById(modalId)
     if (modal) {
       modal.classList.add("active")
     }
   }
 
-  window.closeModal = function(modalId) {
+  window.closeModal = (modalId) => {
     const modal = document.getElementById(modalId)
     if (modal) {
       modal.classList.remove("active")
@@ -380,113 +442,113 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Image preview functions dengan resize preview
-  window.previewImage = function(input) {
-    const preview = document.getElementById('image-preview')
-    const previewImg = document.getElementById('preview-img')
-    
+  window.previewImage = (input) => {
+    const preview = document.getElementById("image-preview")
+    const previewImg = document.getElementById("preview-img")
+
     if (input.files && input.files[0]) {
       const file = input.files[0]
-      
+
       // Validate file type
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+      const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"]
       if (!validTypes.includes(file.type)) {
-        alert('Hanya file gambar (JPG, PNG, GIF) yang diperbolehkan!')
-        input.value = ''
+        alert("Hanya file gambar (JPG, PNG, GIF) yang diperbolehkan!")
+        input.value = ""
         return
       }
-      
+
       // Validate file size (max 5MB)
       const maxSize = 5 * 1024 * 1024 // 5MB
       if (file.size > maxSize) {
-        alert('Ukuran file terlalu besar! Maksimal 5MB.')
-        input.value = ''
+        alert("Ukuran file terlalu besar! Maksimal 5MB.")
+        input.value = ""
         return
       }
-      
+
       const reader = new FileReader()
-      reader.onload = function(e) {
+      reader.onload = (e) => {
         if (previewImg) {
           previewImg.src = e.target.result
-          // Preview juga menampilkan ukuran 100px seperti hasil akhir
-          previewImg.style.maxHeight = '150px'
-          previewImg.style.maxWidth = 'auto'
-          previewImg.style.objectFit = 'cover'
         }
         if (preview) {
-          preview.style.display = 'block'
+          preview.style.display = "block"
         }
       }
       reader.readAsDataURL(file)
     }
   }
 
-  window.removeImage = function() {
-    const input = document.getElementById('image')
-    const preview = document.getElementById('image-preview')
-    
-    if (input) input.value = ''
-    if (preview) preview.style.display = 'none'
+  window.removeImage = () => {
+    const input = document.getElementById("image")
+    const preview = document.getElementById("image-preview")
+
+    if (input) input.value = ""
+    if (preview) preview.style.display = "none"
   }
 
   // Detail Modal Function
-  window.showItemDetail = function(itemId) {
-    const itemCard = document.querySelector(`[data-id="${itemId}"]`);
-    if (!itemCard) return;
-    
-    const itemDataScript = itemCard.querySelector('.item-data');
-    if (!itemDataScript) return;
-    
-    const itemData = JSON.parse(itemDataScript.textContent);
-    
+  window.showItemDetail = (itemId) => {
+    const itemCard = document.querySelector(`[data-id="${itemId}"]`)
+    if (!itemCard) return
+
+    const itemDataScript = itemCard.querySelector(".item-data")
+    if (!itemDataScript) return
+
+    const itemData = JSON.parse(itemDataScript.textContent)
+
     // Format tanggal
     const formattedDate = new Date(itemData.date_occurred).toLocaleDateString("id-ID", {
       weekday: "long",
-      day: "numeric", 
+      day: "numeric",
       month: "long",
-      year: "numeric"
-    });
-    
+      year: "numeric",
+    })
+
     const formattedCreatedAt = new Date(itemData.created_at).toLocaleDateString("id-ID", {
       day: "numeric",
-      month: "long", 
+      month: "long",
       year: "numeric",
       hour: "2-digit",
-      minute: "2-digit"
-    });
-    
+      minute: "2-digit",
+    })
+
     // Buat konten modal
-    const modalBody = document.getElementById('detail-modal-body');
-    const modalTitle = document.getElementById('detail-modal-title');
-    
-    modalTitle.textContent = itemData.title;
-    
+    const modalBody = document.getElementById("detail-modal-body")
+    const modalTitle = document.getElementById("detail-modal-title")
+
+    modalTitle.textContent = itemData.title
+
     // Tentukan icon berdasarkan kategori
-    const icon = getItemIcon(itemData.category_name);
-    
+    const icon = getItemIcon(itemData.category_name)
+
     modalBody.innerHTML = `
       <div class="detail-content">
         <div class="detail-image-section">
-          ${itemData.image && itemData.image.trim() !== '' ? `
+          ${
+            itemData.image && itemData.image.trim() !== ""
+              ? `
             <div class="detail-image-container">
               <img src="${itemData.image}" 
                    alt="${itemData.title}" 
                    class="detail-image-large"
                    style="width: 200px; height: auto; object-fit: cover; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15);">
             </div>
-          ` : `
+          `
+              : `
             <div class="detail-image-container no-image">
               <div class="detail-image-placeholder" style="width: 200px; height: auto; background: linear-gradient(135deg, #4bc3ff, #95e8de); border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.15);">
                 <i class="fas fa-${icon}" style="font-size: 5rem; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.1);"></i>
               </div>
             </div>
-          `}
+          `
+          }
         </div>
         
         <div class="detail-info-section">
           <div class="detail-category">
             <span class="category-badge">${itemData.category_name}</span>
             <span class="status-badge status-${itemData.type}">
-              ${itemData.type === 'hilang' ? 'BARANG HILANG' : 'BARANG DITEMUKAN'}
+              ${itemData.type === "hilang" ? "BARANG HILANG" : "BARANG DITEMUKAN"}
             </span>
           </div>
           
@@ -517,28 +579,27 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           
           <div class="detail-actions">
-            <a href="https://wa.me/${itemData.contact_info.replace(/[^0-9]/g, '')}" 
+            <a href="https://wa.me/${itemData.contact_info.replace(/[^0-9]/g, "")}" 
                target="_blank" 
                class="contact-btn-large">
               <i class="fab fa-whatsapp"></i>
               Hubungi via WhatsApp
             </a>
-            <button class="share-btn" onclick="shareItem('${itemData.title.replace(/'/g, "\\'")}', '${itemData.description.replace(/'/g, "\\'")}')">
+            <button class="share-btn" onclick="window.shareItem('${itemData.title.replace(/'/g, "\\'")}', '${itemData.description.replace(/'/g, "\\'")}')">
               <i class="fas fa-share"></i>
               Bagikan
             </button>
           </div>
         </div>
       </div>
-    `;
-    
-    // Tampilkan modal
-    openModal('detail-modal');
+    `
 
+    // Tampilkan modal
+    window.openModal("detail-modal")
   }
 
   // Share function
-  window.shareItem = function(title, description) {
+  window.shareItem = (title, description) => {
     if (navigator.share) {
       navigator.share({
         title: title,
@@ -548,40 +609,21 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       // Fallback - copy to clipboard
       const text = `${title}\n\n${description}\n\n${window.location.href}`
-      navigator.clipboard.writeText(text).then(() => {
-        alert("Link item berhasil disalin!")
-      }).catch(() => {
-        // Fallback untuk browser lama
-        const textArea = document.createElement('textarea')
-        textArea.value = text
-        document.body.appendChild(textArea)
-        textArea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textArea)
-        alert("Link item berhasil disalin!")
-      })
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          alert("Link item berhasil disalin!")
+        })
+        .catch(() => {
+          // Fallback untuk browser lama
+          const textArea = document.createElement("textarea")
+          textArea.value = text
+          document.body.appendChild(textArea)
+          textArea.select()
+          document.execCommand("copy")
+          document.body.removeChild(textArea)
+          alert("Link item berhasil disalin!")
+        })
     }
   }
-  // Close modal when clicking outside
-  window.addEventListener('click', function(e) {
-      if (e.target.classList.contains('modal')) {
-          e.target.classList.remove('active');
-      }
-  });
-
-  // Global functions for edit/delete
-  function editItem(id, type) {
-      console.log('Edit item:', id);
-      // Implement edit functionality
-  }
-
-  function deleteItem(id, type) {
-      if (!confirm("Apakah Anda yakin ingin menghapus item ini?")) {
-          return;
-      }
-      console.log('Delete item:', id);
-      // Implement delete functionality
-  }
-
-  
 })

@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_item'])) {
             $message = 'Semua field wajib diisi';
             $messageType = 'error';
         } else {
-            // Handle image upload - TANPA RESIZE
+            // Handle image upload
             $imagePath = null;
             if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
                 $uploadDir = 'uploads/lost-found/';
@@ -171,6 +171,8 @@ try {
     <link rel="stylesheet" href="assets/css/lost-found.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/lost-found.js"></script>
 </head>
 <body>
     <!-- Navigation -->
@@ -238,10 +240,6 @@ try {
                         <option value="hilang" <?= (($_GET['type'] ?? '') === 'hilang') ? 'selected' : '' ?>>Hilang</option>
                         <option value="ditemukan" <?= (($_GET['type'] ?? '') === 'ditemukan') ? 'selected' : '' ?>>Ditemukan</option>
                     </select>
-                    <button type="submit" class="btn-primary">
-                        <i class="fas fa-filter"></i>
-                        Filter
-                    </button>
                 </div>
             </form>
         </div>
@@ -285,7 +283,6 @@ try {
                             
                             <div class="item-image <?= $imageClass ?>">
                                 <?php if ($hasImage): ?>
-                                    <!-- CSS akan mengatur ukuran gambar -->
                                     <img src="<?= htmlspecialchars($item['image']) ?>" 
                                          alt="<?= htmlspecialchars($item['title']) ?>" 
                                          loading="lazy"
@@ -438,9 +435,9 @@ try {
                 <div class="form-group">
                     <label for="image" class="optional">Foto Barang</label>
                     <input type="file" id="image" name="image" accept="image/jpeg,image/jpg,image/png,image/gif" onchange="previewImage(this)">
-                    <small>Format: JPG, PNG, GIF. Maksimal 5MB. Ukuran akan disesuaikan otomatis dengan CSS.</small>
+                    <small>Format: JPG, PNG, GIF. Maksimal 5MB.</small>
                     <div class="image-preview" id="image-preview" style="display: none;">
-                        <img id="preview-img" src="" alt="Preview" class="preview-image">
+                        <img id="preview-img" alt="Preview" class="preview-image">
                         <br>
                         <button type="button" class="remove-image" onclick="removeImage()">Hapus Foto</button>
                     </div>
@@ -500,9 +497,6 @@ try {
             <p>&copy; 2024 E-Statmad. Semua hak dilindungi.</p>
         </div>
     </footer>
-
-    <script src="assets/js/main.js"></script>
-    <script src="assets/js/lost-found.js"></script>
     <script>
         function openModal(modalId) {
             document.getElementById(modalId).classList.add('active');
@@ -708,22 +702,6 @@ try {
                 e.target.classList.remove('active');
             }
         });
-
-        // Global functions for edit/delete
-        function editItem(id, type) {
-            console.log('Edit item:', id);
-            // Implement edit functionality
-            alert('Fitur edit akan segera tersedia!');
-        }
-
-        function deleteItem(id, type) {
-            if (!confirm("Apakah Anda yakin ingin menghapus item ini?")) {
-                return;
-            }
-            console.log('Delete item:', id);
-            // Implement delete functionality
-            alert('Fitur hapus akan segera tersedia!');
-        }
     </script>
     <?php if ($message): ?>
         <script>

@@ -43,65 +43,115 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_activity'])) {
                 $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
                 
                 if (in_array($fileExtension, $allowedExtensions)) {
-                    $fileName = uniqid() . '.' . $fileExtension;
-                    $targetPath = $uploadDir . $fileName;
-                    
-                    if (move_uploaded_file($_FILES['image']['tmp_name'], $targetPath)) {
-                        $imagePath = $targetPath;
+                    // Validasi ukuran file (max 5MB)
+                    if ($_FILES['image']['size'] > 5 * 1024 * 1024) {
+                        $message = 'Ukuran file terlalu besar! Maksimal 5MB.';
+                        $messageType = 'error';
+                    } else {
+                        // Validasi adalah gambar yang valid
+                        $imageInfo = getimagesize($_FILES['image']['tmp_name']);
+                        if ($imageInfo === false) {
+                            $message = 'File yang diupload bukan gambar yang valid.';
+                            $messageType = 'error';
+                        } else {
+                            $fileName = uniqid() . '.' . $fileExtension;
+                            $targetPath = $uploadDir . $fileName;
+                            
+                            if (move_uploaded_file($_FILES['image']['tmp_name'], $targetPath)) {
+                                $imagePath = $targetPath;
+                            } else {
+                                $message = 'Gagal mengupload file gambar.';
+                                $messageType = 'error';
+                            }
+                        }
                     }
+                } else {
+                    $message = 'Format file tidak didukung. Hanya JPG, PNG, dan GIF yang diperbolehkan.';
+                    $messageType = 'error';
                 }
             }
             
-            $insertQuery = "INSERT INTO activities (user_id, category_id, title, description, event_date, event_time, location, organizer, contact_info, image) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $stmt = $db->prepare($insertQuery);
-            
-            if ($stmt->execute([$user['id'], $data['category_id'], $data['title'], $data['description'], 
-                               $data['event_date'], $data['event_time'], $data['location'], $data['organizer'], $user['phone'], $imagePath])) {
-                $message = 'Kegiatan berhasil ditambahkan!';
-                $messageType = 'success';
-            } else {
-                $message = 'Gagal menambahkan kegiatan';
-                $messageType = 'error';
+            // Lanjutkan insert jika tidak ada error
+            if (empty($message)) {
+                try {
+                    $insertQuery = "INSERT INTO activities (user_id, category_id, title, description, event_date, event_time, location, organizer, contact_info, image) 
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $stmt = $db->prepare($insertQuery);
+                    
+                    if ($stmt->execute([$user['id'], $data['category_id'], $data['title'], $data['description'], 
+                                       $data['event_date'], $data['event_time'], $data['location'], $data['organizer'], $user['phone'], $imagePath])) {
+                        $message = 'Kegiatan berhasil ditambahkan!';
+                        $messageType = 'success';
+                        
+                        // Reset form data
+                        $_POST = [];
+                    } else {
+                        $message = 'Gagal menambahkan kegiatan ke database.';
+                        $messageType = 'error';
+                        
+                        // Hapus file jika insert gagal
+                        if ($imagePath && file_exists($imagePath)) {
+                            unlink($imagePath);
+                        }
+                    }
+                } catch (Exception $e) {
+                    $message = 'Terjadi kesalahan: ' . $e->getMessage();
+                    $messageType = 'error';
+                    
+                    // Hapus file jika terjadi error
+                    if ($imagePath && file_exists($imagePath)) {
+                        unlink($imagePath);
+                    }
+                }
             }
         }
     }
 }
 
 // Get categories
-$categoriesQuery = "SELECT * FROM categories WHERE type = 'activity'";
-$categoriesStmt = $db->prepare($categoriesQuery);
-$categoriesStmt->execute();
-$categories = $categoriesStmt->fetchAll();
+try {
+    $categoriesQuery = "SELECT * FROM categories WHERE type = 'activity' ORDER BY name ASC";
+    $categoriesStmt = $db->prepare($categoriesQuery);
+    $categoriesStmt->execute();
+    $categories = $categoriesStmt->fetchAll();
+} catch (Exception $e) {
+    $categories = [];
+    error_log("Error fetching categories: " . $e->getMessage());
+}
 
 // Get activities with filters
 $whereConditions = ['a.is_active = 1', 'u.is_active = 1'];
 $params = [];
 
-if (isset($_GET['search']) && !empty($_GET['search'])) {
-    $search = '%' . $_GET['search'] . '%';
+if (isset($_GET['search']) && !empty(trim($_GET['search']))) {
+    $search = '%' . trim($_GET['search']) . '%';
     $whereConditions[] = '(a.title LIKE ? OR a.description LIKE ? OR a.organizer LIKE ?)';
     $params = array_merge($params, [$search, $search, $search]);
 }
 
-if (isset($_GET['category']) && !empty($_GET['category'])) {
+if (isset($_GET['category']) && !empty($_GET['category']) && is_numeric($_GET['category'])) {
     $whereConditions[] = 'a.category_id = ?';
-    $params[] = $_GET['category'];
+    $params[] = (int)$_GET['category'];
 }
 
 $whereClause = implode(' AND ', $whereConditions);
 
-$activitiesQuery = "SELECT a.*, u.first_name, u.last_name, u.phone as user_phone, c.name as category_name,
-                    CONCAT(u.first_name, ' ', u.last_name) as user_name
-                    FROM activities a
-                    JOIN users u ON a.user_id = u.id
-                    JOIN categories c ON a.category_id = c.id
-                    WHERE $whereClause
-                    ORDER BY a.event_date ASC, a.event_time ASC";
+try {
+    $activitiesQuery = "SELECT a.*, u.first_name, u.last_name, u.phone as user_phone, c.name as category_name,
+                        CONCAT(u.first_name, ' ', u.last_name) as user_name
+                        FROM activities a
+                        JOIN users u ON a.user_id = u.id
+                        JOIN categories c ON a.category_id = c.id
+                        WHERE $whereClause
+                        ORDER BY a.event_date ASC, a.event_time ASC";
 
-$activitiesStmt = $db->prepare($activitiesQuery);
-$activitiesStmt->execute($params);
-$activities = $activitiesStmt->fetchAll();
+    $activitiesStmt = $db->prepare($activitiesQuery);
+    $activitiesStmt->execute($params);
+    $activities = $activitiesStmt->fetchAll();
+} catch (Exception $e) {
+    $activities = [];
+    error_log("Error fetching activities: " . $e->getMessage());
+}
 
 ?>
 <!DOCTYPE html>
@@ -177,10 +227,6 @@ $activities = $activitiesStmt->fetchAll();
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <button type="submit" class="btn-primary">
-                        <i class="fas fa-filter"></i>
-                        Filter
-                    </button>
                 </div>
             </form>
         </div>
@@ -200,7 +246,7 @@ $activities = $activitiesStmt->fetchAll();
                     <?php foreach ($activities as $activity): ?>
                         <div class="activity-item" data-id="<?= $activity['id'] ?>" onclick="showActivityDetail(<?= $activity['id'] ?>)">
                             <div class="activity-image">
-                                <?php if ($activity['image']): ?>
+                                <?php if ($activity['image'] && file_exists($activity['image'])): ?>
                                     <img src="<?= htmlspecialchars($activity['image']) ?>" alt="<?= htmlspecialchars($activity['title']) ?>">
                                 <?php else: ?>
                                     <i class="fas fa-calendar-alt"></i>
@@ -229,7 +275,7 @@ $activities = $activitiesStmt->fetchAll();
                                         <span><?= htmlspecialchars($activity['organizer']) ?></span>
                                     </div>
                                 </div>
-                                <p class="activity-description"><?= htmlspecialchars(substr($activity['description'], 0, 150)) ?>...</p>
+                                <p class="activity-description"><?= htmlspecialchars(strlen($activity['description']) > 150 ? substr($activity['description'], 0, 150) . '...' : $activity['description']) ?></p>
                                 <div class="activity-organizer">oleh <?= htmlspecialchars($activity['user_name']) ?></div>
                             </div>
 
@@ -333,9 +379,10 @@ $activities = $activitiesStmt->fetchAll();
                 
                 <div class="form-group">
                     <label for="image" class="optional">Poster/Gambar Kegiatan</label>
-                    <input type="file" id="image" name="image" accept="image/*" onchange="previewImage(this)">
+                    <input type="file" id="image" name="image" accept="image/jpeg,image/jpg,image/png,image/gif" onchange="previewImage(this)">
+                    <small>Format: JPG, PNG, GIF. Maksimal 5MB.</small>
                     <div class="image-preview" id="image-preview" style="display: none;">
-                        <img id="preview-img" src="/placeholder.svg" alt="Preview">
+                        <img id="preview-img" alt="Preview">
                         <br>
                         <button type="button" class="remove-image" onclick="removeImage()">Hapus Foto</button>
                     </div>
@@ -378,6 +425,7 @@ $activities = $activitiesStmt->fetchAll();
                 <ul>
                     <li><i class="fas fa-envelope"></i> info@estatmad.ac.id</li>
                     <li><i class="fas fa-phone"></i> (021) 123-4567</li>
+                    <li><i class="fas fa-phone"></i> (021) 123-4567</li>
                     <li><i class="fas fa-map-marker-alt"></i> POLSTAT STIS, Jakarta</li>
                 </ul>
             </div>
@@ -398,13 +446,210 @@ $activities = $activitiesStmt->fetchAll();
 
     <script src="assets/js/main.js"></script>
     <script src="assets/js/activities.js"></script>
+    <script>
+        function previewImage(input) {
+            const preview = document.getElementById('image-preview')
+            const previewImg = document.getElementById('preview-img')
+            
+            if (input.files && input.files[0]) {
+                const file = input.files[0]
+                
+                // Validate file type
+                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+                if (!validTypes.includes(file.type)) {
+                    alert('Hanya file gambar (JPG, PNG, GIF) yang diperbolehkan!')
+                    input.value = ''
+                    return
+                }
+                
+                // Validate file size (max 5MB)
+                const maxSize = 5 * 1024 * 1024 // 5MB
+                if (file.size > maxSize) {
+                    alert('Ukuran file terlalu besar! Maksimal 5MB.')
+                    input.value = ''
+                    return
+                }
+                
+                const reader = new FileReader()
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result
+                    preview.style.display = 'block'
+                }
+                reader.readAsDataURL(file)
+            }
+        }
+        
+        function removeImage() {
+            const input = document.getElementById('image')
+            const preview = document.getElementById('image-preview')
+            
+            input.value = ''
+            preview.style.display = 'none'
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function showActivityDetail(activityId) {
+            const activityCard = document.querySelector(`[data-id="${activityId}"]`);
+            if (!activityCard) return;
+            
+            const activityDataScript = activityCard.querySelector('.activity-data');
+            if (!activityDataScript) return;
+            
+            try {
+                const activityData = JSON.parse(activityDataScript.textContent);
+                
+                // Format tanggal dan waktu
+                const eventDate = new Date(activityData.event_date);
+                const formattedDate = eventDate.toLocaleDateString("id-ID", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric"
+                });
+                
+                const formattedTime = activityData.event_time.substring(0, 5);
+                
+                const formattedCreatedAt = new Date(activityData.created_at).toLocaleDateString("id-ID", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                });
+                
+                // Buat konten modal
+                const modalBody = document.getElementById('detail-modal-body');
+                const modalTitle = document.getElementById('detail-modal-title');
+                
+                modalTitle.textContent = activityData.title;
+                
+                modalBody.innerHTML = `
+                    <div class="activity-detail-content">
+                        <div class="activity-detail-image-section">
+                            ${activityData.image && activityData.image.trim() !== '' ? `
+                                <div class="activity-detail-image-container">
+                                    <img src="${activityData.image}" 
+                                         alt="${activityData.title}" 
+                                         class="activity-detail-image-large"
+                                         onerror="this.parentElement.innerHTML = '<div class=\\'activity-detail-image-placeholder\\'><i class=\\'fas fa-calendar-alt\\' style=\\'font-size: 5rem; color: white;\\'></i></div>';">
+                                </div>
+                            ` : `
+                                <div class="activity-detail-image-container no-image">
+                                    <div class="activity-detail-image-placeholder">
+                                        <i class="fas fa-calendar-alt" style="font-size: 5rem; color: white; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"></i>
+                                    </div>
+                                </div>
+                            `}
+                        </div>
+                        
+                        <div class="activity-detail-info-section">
+                            <div class="activity-detail-category">
+                                <span class="category-badge">${activityData.category_name}</span>
+                            </div>
+                            
+                            <h3 class="activity-detail-title">${activityData.title}</h3>
+                            
+                            <div class="activity-detail-meta">
+                                <div class="meta-row">
+                                    <i class="fas fa-calendar"></i>
+                                    <span><strong>Tanggal:</strong> ${formattedDate}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <i class="fas fa-clock"></i>
+                                    <span><strong>Waktu:</strong> ${formattedTime} WIB</span>
+                                </div>
+                                <div class="meta-row">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    <span><strong>Lokasi:</strong> ${activityData.location}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <i class="fas fa-users"></i>
+                                    <span><strong>Penyelenggara:</strong> ${activityData.organizer}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <i class="fas fa-user"></i>
+                                    <span><strong>Dibuat oleh:</strong> ${activityData.user_name}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <i class="fas fa-clock"></i>
+                                    <span><strong>Tanggal Dibuat:</strong> ${formattedCreatedAt}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="activity-detail-description">
+                                <h4>Deskripsi:</h4>
+                                <p>${activityData.description}</p>
+                            </div>
+                            
+                            <div class="activity-detail-actions">
+                                <a href="https://wa.me/${activityData.contact_info.replace(/[^0-9]/g, '')}" 
+                                   target="_blank" 
+                                   class="contact-btn-large">
+                                    <i class="fab fa-whatsapp"></i>
+                                    Hubungi Penyelenggara
+                                </a>
+                                <button class="share-btn" onclick="shareActivity('${activityData.title.replace(/'/g, "\\'")}', '${activityData.description.replace(/'/g, "\\'")}')">
+                                    <i class="fas fa-share"></i>
+                                    Bagikan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Tampilkan modal
+                openModal('detail-modal');
+            } catch (error) {
+                console.error('Error parsing activity data:', error);
+                alert('Terjadi kesalahan saat menampilkan detail kegiatan.');
+            }
+        }
+        
+        function shareActivity(title, description) {
+            if (navigator.share) {
+                navigator.share({
+                    title: title,
+                    text: description,
+                    url: window.location.href,
+                });
+            } else {
+                // Fallback - copy to clipboard
+                const text = `${title}\n\n${description}\n\n${window.location.href}`;
+                navigator.clipboard.writeText(text).then(() => {
+                    alert("Link kegiatan berhasil disalin!");
+                }).catch(() => {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    alert("Link kegiatan berhasil disalin!");
+                });
+            }
+        }
+    </script>
     <?php if ($message): ?>
         <script>
-            // Pass PHP message to JavaScript
-            window.phpMessage = {
-                text: <?= json_encode($message) ?>,
-                type: '<?= $messageType ?>'
-            };
+            document.addEventListener('DOMContentLoaded', function() {
+                const alertType = '<?= $messageType ?>' === 'success' ? 'success' : 'error';
+                const alertMessage = <?= json_encode($message) ?>;
+                
+                // Simple alert - replace with your preferred notification system
+                if (alertType === 'success') {
+                    alert('✅ ' + alertMessage);
+                } else {
+                    alert('❌ ' + alertMessage);
+                }
+            });
         </script>
     <?php endif; ?>
 </body>
